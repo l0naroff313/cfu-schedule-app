@@ -1,0 +1,6 @@
+@UniversitySchedule.Api_HostAddress = http://localhost:5289
+
+GET {{UniversitySchedule.Api_HostAddress}}/api/v1/system/health
+Accept: application/json
+
+###

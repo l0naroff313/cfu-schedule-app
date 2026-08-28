@@ -9,3 +9,37 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# .NET build output
+bin/
+obj/
+artifacts/
+TestResults/
+coverage/
+*.trx
+
+# IDEs and user-specific files
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local databases and development state
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Mobile build artifacts
+*.apk
+*.aab
+*.ipa
+*.dSYM/
+
+# Local tool caches
+.dotnet/
+.nuget/
+Directory.Build.local.props

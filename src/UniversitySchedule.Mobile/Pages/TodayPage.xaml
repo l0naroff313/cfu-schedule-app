@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniversitySchedule.Mobile.Pages.TodayPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False"
+    Title="Сегодня">
+    <ScrollView>
+        <VerticalStackLayout Padding="16,24" Spacing="16">
+            <Label Style="{StaticResource PageTitle}" Text="Сегодня" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Style="{StaticResource SectionTitle}" Text="Учебный профиль не выбран" />
+                    <Label
+                        Style="{StaticResource SecondaryText}"
+                        Text="После выбора института, направления, группы и подгруппы здесь появятся текущая и следующая пары." />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

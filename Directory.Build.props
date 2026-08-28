@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>14.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <Import
+    Project="$(MSBuildThisFileDirectory)Directory.Build.local.props"
+    Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.local.props')" />
+</Project>

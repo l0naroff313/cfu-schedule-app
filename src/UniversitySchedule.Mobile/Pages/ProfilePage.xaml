@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniversitySchedule.Mobile.Pages.ProfilePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Shell.NavBarIsVisible="False"
+    Title="Профиль">
+    <VerticalStackLayout Padding="16,24" Spacing="16">
+        <Label Style="{StaticResource PageTitle}" Text="Профиль" />
+        <Border Style="{StaticResource Card}">
+            <VerticalStackLayout Spacing="8">
+                <Label Style="{StaticResource SectionTitle}" Text="КФУ им. В. И. Вернадского" />
+                <Label Style="{StaticResource SecondaryText}" Text="Учебный профиль пока не настроен." />
+            </VerticalStackLayout>
+        </Border>
+    </VerticalStackLayout>
+</ContentPage>

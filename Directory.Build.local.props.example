@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
+    <AndroidSdkDirectory>C:\path\to\Android\Sdk</AndroidSdkDirectory>
+    <JavaSdkDirectory>C:\path\to\Microsoft\jdk-21</JavaSdkDirectory>
+  </PropertyGroup>
+</Project>

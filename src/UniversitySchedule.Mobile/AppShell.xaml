@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="UniversitySchedule.Mobile.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="КФУ ЭлЖур">
+
+    <TabBar>
+        <ShellContent
+            x:Name="TodayTab"
+            Title="Сегодня"
+            Icon="tab_today.svg"
+            Route="today" />
+        <ShellContent
+            x:Name="ScheduleTab"
+            Title="Расписание"
+            Icon="tab_schedule.svg"
+            Route="schedule" />
+        <ShellContent
+            x:Name="AssignmentsTab"
+            Title="Задания"
+            Icon="tab_assignments.svg"
+            Route="assignments" />
+        <ShellContent
+            x:Name="NotesTab"
+            Title="Заметки"
+            Icon="tab_notes.svg"
+            Route="notes" />
+        <ShellContent
+            x:Name="ProfileTab"
+            Title="Профиль"
+            Icon="tab_profile.svg"
+            Route="profile" />
+    </TabBar>
+
+</Shell>
