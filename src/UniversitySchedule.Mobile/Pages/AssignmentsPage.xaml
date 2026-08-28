@@ -6,9 +6,24 @@
     Shell.NavBarIsVisible="False"
     Title="Задания">
     <VerticalStackLayout Padding="16,24" Spacing="16">
-        <Label Style="{StaticResource PageTitle}" Text="Задания" />
+        <Grid ColumnDefinitions="*,Auto">
+            <Label
+                Grid.Column="0"
+                Style="{StaticResource PageTitle}"
+                Text="Задания"
+                VerticalOptions="Center" />
+            <Button
+                Grid.Column="1"
+                IsEnabled="False"
+                SemanticProperties.Description="Добавить задание; станет доступно после настройки профиля"
+                Style="{StaticResource CompactAddButton}"
+                Text="+" />
+        </Grid>
         <Border Style="{StaticResource Card}">
-            <Label Style="{StaticResource SecondaryText}" Text="Здесь будут храниться личные домашние задания и дедлайны." />
+            <VerticalStackLayout Spacing="6">
+                <Label Style="{StaticResource SecondaryText}" Text="Здесь будут храниться личные домашние задания и дедлайны." />
+                <Label Style="{StaticResource SecondaryText}" Text="Добавление станет доступно после выбора учебного профиля." />
+            </VerticalStackLayout>
         </Border>
     </VerticalStackLayout>
 </ContentPage>

@@ -13,6 +13,14 @@ public sealed record StudyGroupSummary(
 
 public sealed record SubgroupSummary(Guid Id, Guid GroupId, string Name);
 
+public sealed record TeacherSummary(
+    Guid Id,
+    string DisplayName,
+    string? SecondaryText = null)
+{
+    public override string ToString() => DisplayName;
+}
+
 public enum SubgroupSelectionPolicy
 {
     NotAvailable = 0,

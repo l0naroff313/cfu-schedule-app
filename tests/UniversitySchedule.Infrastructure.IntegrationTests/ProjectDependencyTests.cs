@@ -21,7 +21,9 @@ public sealed class ProjectDependencyTests
                 "UniversitySchedule.Application",
                 "UniversitySchedule.Infrastructure",
                 "UniversitySchedule.Contracts"),
-            ["UniversitySchedule.Mobile.Core"] = Set("UniversitySchedule.Contracts"),
+            ["UniversitySchedule.Mobile.Core"] = Set(
+                "UniversitySchedule.Contracts",
+                "UniversitySchedule.Domain"),
             ["UniversitySchedule.Mobile"] = Set("UniversitySchedule.Mobile.Core"),
         };
 
@@ -44,7 +46,10 @@ public sealed class ProjectDependencyTests
             {
                 string include = reference.Attribute("Include")?.Value
                     ?? throw new InvalidOperationException($"ProjectReference without Include in {projectPath}.");
-                string dependencyName = Path.GetFileNameWithoutExtension(include);
+                string normalizedInclude = include
+                    .Replace('\\', Path.DirectorySeparatorChar)
+                    .Replace('/', Path.DirectorySeparatorChar);
+                string dependencyName = Path.GetFileNameWithoutExtension(normalizedInclude);
 
                 if (!allowed.Contains(dependencyName))
                 {

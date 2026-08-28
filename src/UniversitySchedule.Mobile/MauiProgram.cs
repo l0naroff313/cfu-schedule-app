@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using UniversitySchedule.Mobile.Core.Scheduling;
 using UniversitySchedule.Mobile.Pages;
 
 namespace UniversitySchedule.Mobile;
@@ -17,6 +18,8 @@ public static class MauiProgram
             });
 
         builder.Services.AddSingleton<AppShell>();
+        builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+        builder.Services.AddTransient<SchedulePageViewModel>();
         builder.Services.AddTransient<TodayPage>();
         builder.Services.AddTransient<SchedulePage>();
         builder.Services.AddTransient<AssignmentsPage>();

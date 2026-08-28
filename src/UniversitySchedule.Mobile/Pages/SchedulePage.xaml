@@ -3,12 +3,127 @@
     x:Class="UniversitySchedule.Mobile.Pages.SchedulePage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewModels="clr-namespace:UniversitySchedule.Mobile.Core.Scheduling;assembly=UniversitySchedule.Mobile.Core"
+    x:DataType="viewModels:SchedulePageViewModel"
     Shell.NavBarIsVisible="False"
     Title="Расписание">
-    <VerticalStackLayout Padding="16,24" Spacing="16">
-        <Label Style="{StaticResource PageTitle}" Text="Расписание" />
-        <Border Style="{StaticResource Card}">
-            <Label Style="{StaticResource SecondaryText}" Text="Расписание будет доступно после первичной настройки." />
-        </Border>
-    </VerticalStackLayout>
+    <ScrollView>
+        <VerticalStackLayout Padding="16,24,16,32" Spacing="16">
+            <Label Style="{StaticResource PageTitle}" Text="Расписание" />
+
+            <Border Style="{StaticResource SegmentTrack}">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                    <Button
+                        Grid.Column="0"
+                        Command="{Binding SelectGroupCommand}"
+                        Style="{StaticResource SegmentButton}"
+                        Text="Моя группа">
+                        <Button.Triggers>
+                            <DataTrigger
+                                Binding="{Binding IsGroupMode}"
+                                TargetType="Button"
+                                Value="True">
+                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                                <Setter Property="TextColor" Value="{StaticResource White}" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                    <Button
+                        Grid.Column="1"
+                        Command="{Binding SelectTeacherCommand}"
+                        Style="{StaticResource SegmentButton}"
+                        Text="Преподаватель">
+                        <Button.Triggers>
+                            <DataTrigger
+                                Binding="{Binding IsTeacherMode}"
+                                TargetType="Button"
+                                Value="True">
+                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                                <Setter Property="TextColor" Value="{StaticResource White}" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <VerticalStackLayout
+                IsVisible="{Binding IsTeacherMode}"
+                Spacing="12">
+                <Label Style="{StaticResource SectionTitle}" Text="Выбор преподавателя" />
+                <SearchBar
+                    Placeholder="Найти преподавателя"
+                    SemanticProperties.Description="Поиск преподавателя"
+                    Text="{Binding TeacherQuery}" />
+                <Border
+                    IsVisible="{Binding HasTeacherOptions}"
+                    Style="{StaticResource Card}">
+                    <Picker
+                        ItemsSource="{Binding TeacherOptions}"
+                        SelectedItem="{Binding SelectedTeacher}"
+                        Title="Выберите преподавателя" />
+                </Border>
+                <Label
+                    IsVisible="{Binding HasNoTeacherOptions}"
+                    Style="{StaticResource SecondaryText}"
+                    Text="{Binding TeacherEmptyText}" />
+
+                <Border
+                    IsVisible="{Binding HasSelectedTeacher}"
+                    Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Style="{StaticResource SecondaryText}" Text="Текущая аудитория" />
+                        <Label Style="{StaticResource SecondaryText}" Text="{Binding TeacherStatusTitle}" />
+                        <Label
+                            LineBreakMode="TailTruncation"
+                            MaxLines="2"
+                            Style="{StaticResource SectionTitle}"
+                            Text="{Binding TeacherLocationText}" />
+                        <Label
+                            LineBreakMode="TailTruncation"
+                            MaxLines="2"
+                            Text="{Binding TeacherSubjectText}" />
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+
+            <Border Style="{StaticResource SegmentTrack}">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+                    <Button
+                        Grid.Column="0"
+                        Command="{Binding SelectDayCommand}"
+                        Style="{StaticResource SegmentButton}"
+                        Text="День">
+                        <Button.Triggers>
+                            <DataTrigger
+                                Binding="{Binding IsDayMode}"
+                                TargetType="Button"
+                                Value="True">
+                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                                <Setter Property="TextColor" Value="{StaticResource White}" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                    <Button
+                        Grid.Column="1"
+                        Command="{Binding SelectWeekCommand}"
+                        Style="{StaticResource SegmentButton}"
+                        Text="Неделя">
+                        <Button.Triggers>
+                            <DataTrigger
+                                Binding="{Binding IsWeekMode}"
+                                TargetType="Button"
+                                Value="True">
+                                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                                <Setter Property="TextColor" Value="{StaticResource White}" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <Label Style="{StaticResource SecondaryText}" Text="{Binding ScheduleEmptyText}" />
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>

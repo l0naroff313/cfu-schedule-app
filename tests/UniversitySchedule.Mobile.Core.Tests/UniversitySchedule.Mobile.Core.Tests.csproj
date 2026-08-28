@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\UniversitySchedule.Mobile.Core\UniversitySchedule.Mobile.Core.csproj" />
+    <ProjectReference Include="..\..\src\UniversitySchedule.Domain\UniversitySchedule.Domain.csproj" />
   </ItemGroup>
 
 </Project>
