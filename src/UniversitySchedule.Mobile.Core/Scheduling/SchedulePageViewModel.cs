@@ -5,6 +5,7 @@ using UniversitySchedule.Contracts.Catalog;
 using UniversitySchedule.Contracts.Schedule;
 using UniversitySchedule.Domain.Scheduling;
 using UniversitySchedule.Mobile.Core.Cfu;
+using UniversitySchedule.Mobile.Core.Catalog;
 using UniversitySchedule.Mobile.Core.Presentation;
 
 namespace UniversitySchedule.Mobile.Core.Scheduling;
@@ -28,7 +29,10 @@ public sealed class SchedulePageViewModel : ObservableObject
     private readonly TimeProvider _timeProvider;
     private readonly ScheduleSession? _scheduleSession;
     private readonly CfuScheduleRepository? _scheduleRepository;
+    private readonly IReferenceCatalogProvider? _referenceCatalogProvider;
     private readonly Dictionary<Guid, IReadOnlyList<ScheduleLesson>> _teacherLessons = [];
+    private readonly Dictionary<Guid, TeacherReference> _teacherReferences = [];
+    private ReferenceCatalogSnapshot? _referenceCatalog;
     private IReadOnlyList<TeacherSummary> _allTeachers = [];
     private IReadOnlyList<ScheduleLesson> _scheduleLessons = [];
     private TeacherScheduleCoverage? _teacherSchedule;
@@ -37,24 +41,27 @@ public sealed class SchedulePageViewModel : ObservableObject
     private string _teacherQuery = string.Empty;
     private TeacherSummary? _selectedTeacher;
     private string _teacherStatusTitle = "Выберите преподавателя";
+    private string _teacherDetailLabel = "Текущая аудитория";
     private string _teacherSubjectText = string.Empty;
     private string _teacherLocationText = "Расписание появится после синхронизации.";
     private string _syncStatusText = "Расписание ещё не загружено.";
     private bool _isLoading;
 
     public SchedulePageViewModel(TimeProvider timeProvider)
-        : this(timeProvider, null, null)
+        : this(timeProvider, null, null, null)
     {
     }
 
     public SchedulePageViewModel(
         TimeProvider timeProvider,
         ScheduleSession? scheduleSession,
-        CfuScheduleRepository? scheduleRepository)
+        CfuScheduleRepository? scheduleRepository,
+        IReferenceCatalogProvider? referenceCatalogProvider = null)
     {
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _scheduleSession = scheduleSession;
         _scheduleRepository = scheduleRepository;
+        _referenceCatalogProvider = referenceCatalogProvider;
 
         SelectGroupCommand = new RelayCommand(() => Audience = ScheduleAudience.Group);
         SelectTeacherCommand = new RelayCommand(() => Audience = ScheduleAudience.Teacher);
@@ -183,6 +190,12 @@ public sealed class SchedulePageViewModel : ObservableObject
         private set => SetProperty(ref _teacherStatusTitle, value);
     }
 
+    public string TeacherDetailLabel
+    {
+        get => _teacherDetailLabel;
+        private set => SetProperty(ref _teacherDetailLabel, value);
+    }
+
     public string TeacherSubjectText
     {
         get => _teacherSubjectText;
@@ -226,6 +239,7 @@ public sealed class SchedulePageViewModel : ObservableObject
         try
         {
             await _scheduleSession.InitializeAsync(cancellationToken);
+            await LoadReferenceCatalogAsync(cancellationToken);
             ApplySession();
         }
         finally
@@ -240,6 +254,12 @@ public sealed class SchedulePageViewModel : ObservableObject
     {
         if (_scheduleRepository is null || string.IsNullOrWhiteSpace(query) || query.Trim().Length < 2)
         {
+            return;
+        }
+
+        if (_referenceCatalog is not null)
+        {
+            TeacherQuery = query;
             return;
         }
 
@@ -302,6 +322,20 @@ public sealed class SchedulePageViewModel : ObservableObject
             return;
         }
 
+        if (_teacherReferences.TryGetValue(SelectedTeacher.Id, out TeacherReference? reference) &&
+            reference.Schedule.Count == 0)
+        {
+            string disciplines = reference.Disciplines.Count == 0
+                ? "Дисциплины не указаны в источнике."
+                : string.Join(", ", reference.Disciplines.Take(5));
+            SetTeacherStatus(
+                "Расписание не опубликовано",
+                reference.Position ?? string.Empty,
+                disciplines,
+                "Преподаваемые дисциплины");
+            return;
+        }
+
         DateTimeOffset now = _timeProvider.GetUtcNow();
         if (_teacherSchedule is null || !_teacherSchedule.Covers(SelectedTeacher.Id, now))
         {
@@ -338,6 +372,31 @@ public sealed class SchedulePageViewModel : ObservableObject
             return;
         }
 
+        if (_referenceCatalog is not null && _teacherReferences.TryGetValue(teacher.Id, out TeacherReference? reference))
+        {
+            IReadOnlyList<ScheduleLesson> referenceLessons = ReferenceTeacherScheduleMapper.Map(_referenceCatalog, reference);
+            _teacherLessons[teacher.Id] = referenceLessons;
+            ApplyTeacherCoverage(
+                teacher,
+                referenceLessons,
+                ParseCatalogDate(_referenceCatalog.Calendar.EvenWeekMondays.Concat(_referenceCatalog.Calendar.OddWeekMondays).MinOrDefault()),
+                ParseCatalogDate(_referenceCatalog.Calendar.EvenWeekMondays.Concat(_referenceCatalog.Calendar.OddWeekMondays).MaxOrDefault())?.AddDays(6));
+            RefreshVisibleLessons();
+            if (referenceLessons.Count == 0)
+            {
+                string disciplines = reference.Disciplines.Count == 0
+                    ? "Дисциплины не указаны в источнике."
+                    : string.Join(", ", reference.Disciplines.Take(5));
+                SetTeacherStatus(
+                    "Расписание не опубликовано",
+                    reference.Position ?? string.Empty,
+                    disciplines,
+                    "Преподаваемые дисциплины");
+            }
+
+            return;
+        }
+
         try
         {
             CfuTeacherSearchLoadResult result = await _scheduleRepository!.SearchTeachersAsync(teacher.DisplayName);
@@ -367,16 +426,20 @@ public sealed class SchedulePageViewModel : ObservableObject
         {
             _scheduleLessons = [];
             SyncStatusText = "Расписание ещё не загружено.";
-            SetTeachers([]);
+            SetTeachers(_referenceCatalog?.Teachers.Select(teacher =>
+                new TeacherSummary(teacher.Id, teacher.FullName, teacher.Position)) ?? []);
             RefreshVisibleLessons();
             return;
         }
 
         _scheduleLessons = _scheduleSession.Snapshot.Lessons;
-        SetTeachers(_scheduleLessons
+        IEnumerable<TeacherSummary> groupTeachers = _scheduleLessons
             .SelectMany(lesson => lesson.Teachers)
             .GroupBy(teacher => teacher.Id)
-            .Select(group => group.First()));
+            .Select(group => group.First());
+        SetTeachers(_referenceCatalog is null
+            ? groupTeachers
+            : _referenceCatalog.Teachers.Select(teacher => new TeacherSummary(teacher.Id, teacher.FullName, teacher.Position)).Concat(groupTeachers));
         if (_scheduleSession.UpdatedAtUtc is DateTimeOffset updatedAt)
         {
             SyncStatusText = FormatSyncStatus(updatedAt, _scheduleSession.IsFromCache);
@@ -388,6 +451,26 @@ public sealed class SchedulePageViewModel : ObservableObject
     private void OnScheduleSessionChanged(object? sender, EventArgs e)
     {
         ApplySession();
+    }
+
+    private async Task LoadReferenceCatalogAsync(CancellationToken cancellationToken)
+    {
+        if (_referenceCatalogProvider is null || _referenceCatalog is not null)
+        {
+            return;
+        }
+
+        _referenceCatalog = await _referenceCatalogProvider.LoadAsync(cancellationToken);
+        _teacherReferences.Clear();
+        if (_referenceCatalog is null)
+        {
+            return;
+        }
+
+        foreach (TeacherReference teacher in _referenceCatalog.Teachers)
+        {
+            _teacherReferences.TryAdd(teacher.Id, teacher);
+        }
     }
 
     private void ApplyTeacherCoverage(
@@ -474,11 +557,16 @@ public sealed class SchedulePageViewModel : ObservableObject
         OnPropertyChanged(nameof(TeacherEmptyText));
     }
 
-    private void SetTeacherStatus(string title, string subject, string location)
+    private void SetTeacherStatus(
+        string title,
+        string subject,
+        string location,
+        string detailLabel = "Текущая аудитория")
     {
         TeacherStatusTitle = title;
         TeacherSubjectText = subject;
         TeacherLocationText = location;
+        TeacherDetailLabel = detailLabel;
     }
 
     private static string FormatLocation(string? building, string? classroom)
@@ -516,6 +604,22 @@ public sealed class SchedulePageViewModel : ObservableObject
     {
         return DateOnly.FromDateTime(_timeProvider.GetUtcNow().ToOffset(UniversityUtcOffset).DateTime);
     }
+
+    private static DateOnly? ParseCatalogDate(string? value)
+    {
+        return DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly date)
+            ? date
+            : null;
+    }
+}
+
+internal static class SchedulePageEnumerableExtensions
+{
+    public static string? MinOrDefault(this IEnumerable<string> values) =>
+        values.OrderBy(value => value, StringComparer.Ordinal).FirstOrDefault();
+
+    public static string? MaxOrDefault(this IEnumerable<string> values) =>
+        values.OrderByDescending(value => value, StringComparer.Ordinal).FirstOrDefault();
 }
 
 public enum ScheduleAudience

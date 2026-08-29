@@ -1,18 +1,31 @@
 namespace UniversitySchedule.ScheduleImporter;
 
-public class Worker(ILogger<Worker> logger) : BackgroundService
+public sealed class Worker(
+    ReferenceCatalogBuilder builder,
+    ReferenceCatalogWriter writer,
+    IHostApplicationLifetime lifetime,
+    ILogger<Worker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Schedule importer host started");
-
         try
         {
-            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
+            logger.LogInformation("Reference catalog import started");
+            await writer.WriteAsync(await builder.BuildAsync(stoppingToken), stoppingToken);
+            logger.LogInformation("Reference catalog import completed");
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            logger.LogInformation("Schedule importer host stopped");
+            logger.LogInformation("Reference catalog import cancelled; cached pages remain available for resume");
+        }
+        catch (Exception exception)
+        {
+            logger.LogCritical(exception, "Reference catalog import failed; the previous output was preserved");
+            Environment.ExitCode = 1;
+        }
+        finally
+        {
+            lifetime.StopApplication();
         }
     }
 }

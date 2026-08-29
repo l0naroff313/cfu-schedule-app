@@ -61,7 +61,7 @@ public static class CfuScheduleMapper
             .Select(name => name.Trim())
             .Distinct(StringComparer.CurrentCultureIgnoreCase)
             .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
-            .Select(name => new TeacherSummary(CfuStableId.Create("teacher", name), name))
+            .Select(CreateTeacherSummary)
             .ToArray();
         (DateOnly from, DateOnly to) = ResolveCoverage(index, lessons);
 
@@ -178,7 +178,7 @@ public static class CfuScheduleMapper
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Select(name => name.Trim())
             .Distinct(StringComparer.CurrentCultureIgnoreCase)
-            .Select(name => new TeacherSummary(CfuStableId.Create("teacher", name), name))
+            .Select(CreateTeacherSummary)
             .ToArray();
         string normalizedGroup = groupCode.Trim();
         ScheduleGroupReference[] groups = string.IsNullOrWhiteSpace(normalizedGroup)
@@ -341,5 +341,13 @@ public static class CfuScheduleMapper
     private static string? NormalizeOptional(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static TeacherSummary CreateTeacherSummary(string displayName)
+    {
+        string identityKey = TeacherIdentityParser.TryParse(displayName, out TeacherIdentity identity)
+            ? identity.Key
+            : displayName;
+        return new TeacherSummary(CfuStableId.Create("teacher", identityKey), displayName);
     }
 }

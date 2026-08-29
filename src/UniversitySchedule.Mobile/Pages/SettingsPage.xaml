@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniversitySchedule.Mobile.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+    Title="Настройки">
+    <VerticalStackLayout Padding="16,24" Spacing="18">
+        <Border Style="{StaticResource Card}">
+            <VerticalStackLayout Spacing="12">
+                <Label Style="{StaticResource SectionTitle}" Text="Оформление" />
+                <Label Style="{StaticResource SecondaryText}" Text="Выберите тему приложения. Системная тема меняется вместе с настройками телефона." />
+                <Button Clicked="OnSystemThemeClicked" Text="Как на устройстве" />
+                <Button Clicked="OnLightThemeClicked" Text="Светлая тема" />
+                <Button Clicked="OnDarkThemeClicked" Text="Тёмная тема" />
+                <Label x:Name="CurrentThemeLabel" Style="{StaticResource SecondaryText}" />
+            </VerticalStackLayout>
+        </Border>
+    </VerticalStackLayout>
+</ContentPage>

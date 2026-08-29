@@ -29,6 +29,12 @@ public partial class ProfilePage : ContentPage
         await Navigation.PushModalAsync(new NavigationPage(setupPage));
     }
 
+    private async void OnSettingsClicked(object? sender, EventArgs e)
+    {
+        var settingsPage = _services.GetRequiredService<SettingsPage>();
+        await Navigation.PushModalAsync(new NavigationPage(settingsPage));
+    }
+
     private void ShowProfile(AcademicProfile? profile)
     {
         if (profile is null)

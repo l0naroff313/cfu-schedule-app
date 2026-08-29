@@ -6,7 +6,22 @@
     Shell.NavBarIsVisible="False"
     Title="Профиль">
     <VerticalStackLayout Padding="16,24" Spacing="16">
-        <Label Style="{StaticResource PageTitle}" Text="Профиль" />
+        <Grid ColumnDefinitions="*,Auto">
+            <Label Style="{StaticResource PageTitle}" Text="Профиль" VerticalOptions="Center" />
+            <Button
+                Grid.Column="1"
+                BackgroundColor="Transparent"
+                Clicked="OnSettingsClicked"
+                FontSize="24"
+                HeightRequest="44"
+                MinimumHeightRequest="44"
+                MinimumWidthRequest="44"
+                Padding="0"
+                SemanticProperties.Description="Открыть настройки"
+                Text="⚙"
+                TextColor="{AppThemeBinding Light={StaticResource PrimaryTextLight}, Dark={StaticResource PrimaryTextDark}}"
+                WidthRequest="44" />
+        </Grid>
         <Border Style="{StaticResource Card}">
             <VerticalStackLayout Spacing="8">
                 <Label Style="{StaticResource SectionTitle}" Text="КФУ им. В. И. Вернадского" />

@@ -1,8 +1,11 @@
 using Microsoft.Extensions.Logging;
+using UniversitySchedule.Mobile.Core.Catalog;
 using UniversitySchedule.Mobile.Core.Cfu;
+using UniversitySchedule.Mobile.Core.Notes;
 using UniversitySchedule.Mobile.Core.Profiles;
 using UniversitySchedule.Mobile.Core.Scheduling;
 using UniversitySchedule.Mobile.Pages;
+using UniversitySchedule.Mobile.Services;
 using UniversitySchedule.Mobile.Storage;
 
 namespace UniversitySchedule.Mobile;
@@ -23,6 +26,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
         builder.Services.AddSingleton<UniversitySchedule.Mobile.Core.Storage.ILocalDataStore, SqliteLocalDataStore>();
+        builder.Services.AddSingleton<IReferenceCatalogProvider, EmbeddedReferenceCatalogProvider>();
+        builder.Services.AddSingleton<PersonalNoteStore>();
+        builder.Services.AddSingleton<ThemeSettingsService>();
         builder.Services.AddSingleton<AcademicProfileStore>();
         builder.Services.AddSingleton(_ =>
         {
@@ -39,12 +45,14 @@ public static class MauiProgram
         builder.Services.AddTransient<ProfileSetupViewModel>();
         builder.Services.AddTransient<TodayPageViewModel>();
         builder.Services.AddTransient<SchedulePageViewModel>();
+        builder.Services.AddTransient<NotesPageViewModel>();
         builder.Services.AddTransient<TodayPage>();
         builder.Services.AddTransient<SchedulePage>();
         builder.Services.AddTransient<AssignmentsPage>();
         builder.Services.AddTransient<NotesPage>();
         builder.Services.AddTransient<ProfilePage>();
         builder.Services.AddTransient<ProfileSetupPage>();
+        builder.Services.AddTransient<SettingsPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

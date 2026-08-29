@@ -34,6 +34,11 @@ public static class CfuScheduleCatalogMapper
             foreach ((string directionName, IReadOnlyDictionary<string, IReadOnlyList<string>> courseTree) in
                      directionTree.OrderBy(item => item.Key, StringComparer.CurrentCultureIgnoreCase))
             {
+                if (!IsAcademicDirection(directionName))
+                {
+                    continue;
+                }
+
                 Guid directionId = CfuStableId.Create("direction", instituteName, directionName);
                 directions.Add(new DirectionSummary(directionId, instituteId, directionName));
 
@@ -61,5 +66,13 @@ public static class CfuScheduleCatalogMapper
         }
 
         return new CfuScheduleCatalog(institutes, directions, groups);
+    }
+
+    private static bool IsAcademicDirection(string value)
+    {
+        string code = value.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault() ?? string.Empty;
+        string[] parts = code.Trim('.').Split('.');
+        return parts.Length == 3 && parts.All(part => int.TryParse(part, out _));
     }
 }

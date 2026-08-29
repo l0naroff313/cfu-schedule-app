@@ -3,12 +3,36 @@
     x:Class="UniversitySchedule.Mobile.Pages.NotesPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:notes="clr-namespace:UniversitySchedule.Mobile.Core.Notes;assembly=UniversitySchedule.Mobile.Core"
+    x:DataType="notes:NotesPageViewModel"
     Shell.NavBarIsVisible="False"
     Title="Заметки">
-    <VerticalStackLayout Padding="16,24" Spacing="16">
-        <Label Style="{StaticResource PageTitle}" Text="Заметки" />
-        <Border Style="{StaticResource Card}">
-            <Label Style="{StaticResource SecondaryText}" Text="Сохранённые заметки будут доступны здесь даже без интернета." />
-        </Border>
-    </VerticalStackLayout>
+    <Grid Padding="16,24,16,32" RowDefinitions="Auto,*" RowSpacing="16">
+        <Grid ColumnDefinitions="*,Auto">
+            <Label Style="{StaticResource PageTitle}" Text="Заметки" VerticalOptions="Center" />
+            <Button
+                Grid.Column="1"
+                Clicked="OnAddNoteClicked"
+                SemanticProperties.Description="Добавить заметку"
+                Style="{StaticResource CompactAddButton}"
+                Text="+" />
+        </Grid>
+        <Grid Grid.Row="1">
+            <CollectionView IsVisible="{Binding HasNotes}" ItemsSource="{Binding Notes}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="notes:NoteListItem">
+                        <Border Margin="0,0,0,10" Style="{StaticResource Card}">
+                            <VerticalStackLayout Spacing="8">
+                                <Label LineBreakMode="TailTruncation" MaxLines="6" Text="{Binding Text}" />
+                                <Label Style="{StaticResource SecondaryText}" Text="{Binding UpdatedText}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+            <Border IsVisible="{Binding HasNoNotes}" Style="{StaticResource Card}" VerticalOptions="Start">
+                <Label Style="{StaticResource SecondaryText}" Text="Нажмите +, чтобы добавить заметку. Она сохранится на устройстве и будет доступна без интернета." />
+            </Border>
+        </Grid>
+    </Grid>
 </ContentPage>

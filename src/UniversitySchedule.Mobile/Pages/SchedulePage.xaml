@@ -72,7 +72,7 @@
                     IsVisible="{Binding HasSelectedTeacher}"
                     Style="{StaticResource Card}">
                     <VerticalStackLayout Spacing="6">
-                        <Label Style="{StaticResource SecondaryText}" Text="Текущая аудитория" />
+                        <Label Style="{StaticResource SecondaryText}" Text="{Binding TeacherDetailLabel}" />
                         <Label Style="{StaticResource SecondaryText}" Text="{Binding TeacherStatusTitle}" />
                         <Label
                             LineBreakMode="TailTruncation"
