@@ -1,3 +1,4 @@
+using UniversitySchedule.Mobile.Core.Identity;
 using UniversitySchedule.Mobile.Services;
 
 namespace UniversitySchedule.Mobile.Pages;
@@ -5,12 +6,23 @@ namespace UniversitySchedule.Mobile.Pages;
 public partial class SettingsPage : ContentPage
 {
     private readonly ThemeSettingsService _themeSettings;
+    private readonly InstallationIdentityService _installationIdentity;
+    private string? _installationId;
 
-    public SettingsPage(ThemeSettingsService themeSettings)
+    public SettingsPage(
+        ThemeSettingsService themeSettings,
+        InstallationIdentityService installationIdentity)
     {
         _themeSettings = themeSettings;
+        _installationIdentity = installationIdentity;
         InitializeComponent();
         RefreshStatus();
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await LoadInstallationIdentityAsync();
     }
 
     private void OnSystemThemeClicked(object? sender, EventArgs e) => SetTheme(AppTheme.Unspecified);
@@ -22,6 +34,17 @@ public partial class SettingsPage : ContentPage
     private async void OnCloseClicked(object? sender, EventArgs e)
     {
         await Navigation.PopModalAsync();
+    }
+
+    private async void OnCopyInstallationIdClicked(object? sender, EventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_installationId))
+        {
+            return;
+        }
+
+        await Clipboard.Default.SetTextAsync(_installationId);
+        await DisplayAlertAsync("Готово", "Идентификатор установки скопирован.", "OK");
     }
 
     private void SetTheme(AppTheme theme)
@@ -38,5 +61,22 @@ public partial class SettingsPage : ContentPage
             AppTheme.Dark => "Сейчас выбрана тёмная тема",
             _ => "Сейчас используется тема устройства",
         };
+    }
+
+    private async Task LoadInstallationIdentityAsync()
+    {
+        try
+        {
+            InstallationIdentity identity = await _installationIdentity.GetOrCreateAsync();
+            _installationId = identity.DisplayId;
+            InstallationIdLabel.Text = identity.DisplayId;
+            CopyInstallationIdButton.IsEnabled = true;
+        }
+        catch (Exception)
+        {
+            _installationId = null;
+            InstallationIdLabel.Text = "Защищённое хранилище недоступно";
+            CopyInstallationIdButton.IsEnabled = false;
+        }
     }
 }

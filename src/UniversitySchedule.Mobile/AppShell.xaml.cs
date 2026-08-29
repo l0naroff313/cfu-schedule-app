@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using UniversitySchedule.Mobile.Core.Identity;
 using UniversitySchedule.Mobile.Core.Scheduling;
 using UniversitySchedule.Mobile.Pages;
 
@@ -8,12 +10,20 @@ public partial class AppShell : Shell
 {
     private readonly IServiceProvider _services;
     private readonly ScheduleSession _scheduleSession;
+    private readonly InstallationIdentityService _installationIdentity;
+    private readonly ILogger<AppShell> _logger;
     private bool _startupChecked;
 
-    public AppShell(IServiceProvider services, ScheduleSession scheduleSession)
+    public AppShell(
+        IServiceProvider services,
+        ScheduleSession scheduleSession,
+        InstallationIdentityService installationIdentity,
+        ILogger<AppShell> logger)
     {
         _services = services;
         _scheduleSession = scheduleSession;
+        _installationIdentity = installationIdentity;
+        _logger = logger;
         InitializeComponent();
 
         TodayTab.ContentTemplate = ResolvePage<TodayPage>(services);
@@ -32,6 +42,15 @@ public partial class AppShell : Shell
         }
 
         _startupChecked = true;
+        try
+        {
+            await _installationIdentity.GetOrCreateAsync();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Secure installation identity could not be initialized");
+        }
+
         await _scheduleSession.InitializeAsync();
         if (_scheduleSession.Profile is null)
         {

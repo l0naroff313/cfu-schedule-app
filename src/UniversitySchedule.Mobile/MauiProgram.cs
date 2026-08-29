@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using UniversitySchedule.Mobile.Core.Assignments;
 using UniversitySchedule.Mobile.Core.Catalog;
 using UniversitySchedule.Mobile.Core.Cfu;
+using UniversitySchedule.Mobile.Core.Identity;
 using UniversitySchedule.Mobile.Core.Notes;
 using UniversitySchedule.Mobile.Core.Profiles;
 using UniversitySchedule.Mobile.Core.Scheduling;
@@ -27,6 +28,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
         builder.Services.AddSingleton<UniversitySchedule.Mobile.Core.Storage.ILocalDataStore, SqliteLocalDataStore>();
+        builder.Services.AddSingleton<ISecureValueStore, MauiSecureValueStore>();
+        builder.Services.AddSingleton<InstallationIdentityService>();
         builder.Services.AddSingleton<IReferenceCatalogProvider, EmbeddedReferenceCatalogProvider>();
         builder.Services.AddSingleton<PersonalNoteStore>();
         builder.Services.AddSingleton<PersonalAssignmentStore>();
