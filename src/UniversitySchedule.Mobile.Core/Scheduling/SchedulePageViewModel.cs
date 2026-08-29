@@ -21,6 +21,12 @@ public sealed record ScheduleLessonListItem(
     string Teachers,
     bool IsCurrent);
 
+public sealed record ScheduleDateItem(
+    DateOnly Date,
+    string DayText,
+    string DateText,
+    bool IsSelected);
+
 public sealed class SchedulePageViewModel : ObservableObject
 {
     private static readonly TimeSpan UniversityUtcOffset = TimeSpan.FromHours(3);
@@ -38,6 +44,8 @@ public sealed class SchedulePageViewModel : ObservableObject
     private TeacherScheduleCoverage? _teacherSchedule;
     private ScheduleAudience _audience = ScheduleAudience.Group;
     private ScheduleRange _range = ScheduleRange.Day;
+    private DateOnly _selectedDate;
+    private ScheduleDateItem? _selectedDateItem;
     private string _teacherQuery = string.Empty;
     private TeacherSummary? _selectedTeacher;
     private string _teacherStatusTitle = "Выберите преподавателя";
@@ -62,11 +70,16 @@ public sealed class SchedulePageViewModel : ObservableObject
         _scheduleSession = scheduleSession;
         _scheduleRepository = scheduleRepository;
         _referenceCatalogProvider = referenceCatalogProvider;
+        _selectedDate = TodayAtUniversity();
 
         SelectGroupCommand = new RelayCommand(() => Audience = ScheduleAudience.Group);
         SelectTeacherCommand = new RelayCommand(() => Audience = ScheduleAudience.Teacher);
         SelectDayCommand = new RelayCommand(() => Range = ScheduleRange.Day);
         SelectWeekCommand = new RelayCommand(() => Range = ScheduleRange.Week);
+        PreviousPeriodCommand = new RelayCommand(() => MoveSelectedDate(Range == ScheduleRange.Day ? -1 : -7));
+        NextPeriodCommand = new RelayCommand(() => MoveSelectedDate(Range == ScheduleRange.Day ? 1 : 7));
+        GoTodayCommand = new RelayCommand(() => SelectedDate = TodayAtUniversity());
+        RefreshWeekDates();
 
         if (_scheduleSession is not null)
         {
@@ -78,6 +91,8 @@ public sealed class SchedulePageViewModel : ObservableObject
 
     public ObservableCollection<ScheduleLessonListItem> Lessons { get; } = [];
 
+    public ObservableCollection<ScheduleDateItem> WeekDates { get; } = [];
+
     public ICommand SelectGroupCommand { get; }
 
     public ICommand SelectTeacherCommand { get; }
@@ -85,6 +100,12 @@ public sealed class SchedulePageViewModel : ObservableObject
     public ICommand SelectDayCommand { get; }
 
     public ICommand SelectWeekCommand { get; }
+
+    public ICommand PreviousPeriodCommand { get; }
+
+    public ICommand NextPeriodCommand { get; }
+
+    public ICommand GoTodayCommand { get; }
 
     public ScheduleAudience Audience
     {
@@ -114,7 +135,41 @@ public sealed class SchedulePageViewModel : ObservableObject
 
             OnPropertyChanged(nameof(IsDayMode));
             OnPropertyChanged(nameof(IsWeekMode));
+            OnPropertyChanged(nameof(PeriodText));
             RefreshVisibleLessons();
+        }
+    }
+
+    public DateOnly SelectedDate
+    {
+        get => _selectedDate;
+        private set
+        {
+            if (!SetProperty(ref _selectedDate, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(PeriodText));
+            RefreshWeekDates();
+            RefreshVisibleLessons();
+        }
+    }
+
+    public ScheduleDateItem? SelectedDateItem
+    {
+        get => _selectedDateItem;
+        set
+        {
+            if (!SetProperty(ref _selectedDateItem, value) || value is null)
+            {
+                return;
+            }
+
+            if (value.Date != SelectedDate)
+            {
+                SelectedDate = value.Date;
+            }
         }
     }
 
@@ -157,6 +212,20 @@ public sealed class SchedulePageViewModel : ObservableObject
     public bool IsDayMode => Range == ScheduleRange.Day;
 
     public bool IsWeekMode => Range == ScheduleRange.Week;
+
+    public string PeriodText
+    {
+        get
+        {
+            if (Range == ScheduleRange.Day)
+            {
+                return Capitalize(SelectedDate.ToString("dddd, d MMMM", RussianCulture));
+            }
+
+            DateOnly monday = StartOfWeek(SelectedDate);
+            return $"{monday:dd.MM}–{monday.AddDays(6):dd.MM.yyyy}";
+        }
+    }
 
     public bool HasTeacherOptions => TeacherOptions.Count > 0;
 
@@ -223,10 +292,12 @@ public sealed class SchedulePageViewModel : ObservableObject
             }
 
             return Range == ScheduleRange.Day
-                ? "На сегодня занятий нет."
-                : "На этой неделе занятий нет.";
+                ? "На выбранную дату занятий нет."
+                : "На выбранной неделе занятий нет.";
         }
     }
+
+    public void SelectDate(DateOnly date) => SelectedDate = date;
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -499,10 +570,9 @@ public sealed class SchedulePageViewModel : ObservableObject
 
     private void RefreshVisibleLessons()
     {
-        DateOnly today = TodayAtUniversity();
-        DateOnly monday = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
-        DateOnly end = Range == ScheduleRange.Day ? today : monday.AddDays(6);
-        DateOnly start = Range == ScheduleRange.Day ? today : monday;
+        DateOnly monday = StartOfWeek(SelectedDate);
+        DateOnly end = Range == ScheduleRange.Day ? SelectedDate : monday.AddDays(6);
+        DateOnly start = Range == ScheduleRange.Day ? SelectedDate : monday;
         IEnumerable<ScheduleLesson> source = IsTeacherMode && SelectedTeacher is not null
             ? _teacherLessons.GetValueOrDefault(SelectedTeacher.Id, _scheduleLessons)
                 .Where(lesson => lesson.Teachers.Any(teacher => teacher.Id == SelectedTeacher.Id))
@@ -533,6 +603,26 @@ public sealed class SchedulePageViewModel : ObservableObject
         OnPropertyChanged(nameof(HasLessons));
         OnPropertyChanged(nameof(HasNoLessons));
         OnPropertyChanged(nameof(ScheduleEmptyText));
+    }
+
+    private void MoveSelectedDate(int days) => SelectedDate = SelectedDate.AddDays(days);
+
+    private void RefreshWeekDates()
+    {
+        DateOnly monday = StartOfWeek(SelectedDate);
+        WeekDates.Clear();
+        for (int offset = 0; offset < 7; offset++)
+        {
+            DateOnly date = monday.AddDays(offset);
+            WeekDates.Add(new ScheduleDateItem(
+                date,
+                date.ToString("ddd", RussianCulture).ToUpper(RussianCulture),
+                date.Day.ToString(CultureInfo.InvariantCulture),
+                date == SelectedDate));
+        }
+
+        _selectedDateItem = WeekDates.First(item => item.Date == SelectedDate);
+        OnPropertyChanged(nameof(SelectedDateItem));
     }
 
     private void ApplyTeacherFilter()
@@ -604,6 +694,13 @@ public sealed class SchedulePageViewModel : ObservableObject
     {
         return DateOnly.FromDateTime(_timeProvider.GetUtcNow().ToOffset(UniversityUtcOffset).DateTime);
     }
+
+    private static DateOnly StartOfWeek(DateOnly date) =>
+        date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
+
+    private static string Capitalize(string value) => value.Length == 0
+        ? value
+        : $"{char.ToUpper(value[0], RussianCulture)}{value[1..]}";
 
     private static DateOnly? ParseCatalogDate(string? value)
     {

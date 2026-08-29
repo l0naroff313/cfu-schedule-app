@@ -25,6 +25,10 @@ public sealed class ThemeSettingsService
             Application.Current.UserAppTheme = theme;
         }
 
+#if ANDROID
+        MainActivity.ApplySystemBars(theme);
+#endif
+
         Preferences.Default.Set(PreferenceKey, theme switch
         {
             AppTheme.Light => "light",

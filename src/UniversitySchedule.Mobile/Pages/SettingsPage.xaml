@@ -4,8 +4,21 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+    Shell.NavBarIsVisible="False"
     Title="Настройки">
-    <VerticalStackLayout Padding="16,24" Spacing="18">
+    <VerticalStackLayout Padding="16,20,16,24" Spacing="18">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+            <Button
+                Clicked="OnCloseClicked"
+                SemanticProperties.Description="Выйти из настроек"
+                Style="{StaticResource IconButton}"
+                Text="‹" />
+            <Label
+                Grid.Column="1"
+                Style="{StaticResource PageTitle}"
+                Text="Настройки"
+                VerticalOptions="Center" />
+        </Grid>
         <Border Style="{StaticResource Card}">
             <VerticalStackLayout Spacing="12">
                 <Label Style="{StaticResource SectionTitle}" Text="Оформление" />
@@ -16,5 +29,9 @@
                 <Label x:Name="CurrentThemeLabel" Style="{StaticResource SecondaryText}" />
             </VerticalStackLayout>
         </Border>
+        <Button
+            Clicked="OnCloseClicked"
+            SemanticProperties.Description="Закрыть настройки и вернуться в профиль"
+            Text="Готово" />
     </VerticalStackLayout>
 </ContentPage>

@@ -5,4 +5,7 @@ public sealed record PersonalNote(
     Guid? LessonId,
     string Text,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string? Title = null,
+    string? Subject = null,
+    bool IsPinned = false);

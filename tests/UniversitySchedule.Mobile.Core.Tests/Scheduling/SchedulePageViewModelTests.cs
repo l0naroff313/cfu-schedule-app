@@ -30,6 +30,24 @@ public sealed class SchedulePageViewModelTests
     }
 
     [Fact]
+    public void DateCommands_NavigateAndReturnToUniversityToday()
+    {
+        SchedulePageViewModel viewModel = CreateViewModel();
+        DateOnly today = viewModel.SelectedDate;
+
+        viewModel.NextPeriodCommand.Execute(null);
+        Assert.Equal(today.AddDays(1), viewModel.SelectedDate);
+
+        viewModel.SelectWeekCommand.Execute(null);
+        viewModel.NextPeriodCommand.Execute(null);
+        Assert.Equal(today.AddDays(8), viewModel.SelectedDate);
+
+        viewModel.GoTodayCommand.Execute(null);
+        Assert.Equal(today, viewModel.SelectedDate);
+        Assert.Single(viewModel.WeekDates, item => item.IsSelected);
+    }
+
+    [Fact]
     public void TeacherQuery_FiltersNamesIgnoringCaseWhitespaceAndYo()
     {
         SchedulePageViewModel viewModel = CreateViewModel();

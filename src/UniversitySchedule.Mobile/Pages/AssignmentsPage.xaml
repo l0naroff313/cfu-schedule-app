@@ -3,27 +3,134 @@
     x:Class="UniversitySchedule.Mobile.Pages.AssignmentsPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:assignments="clr-namespace:UniversitySchedule.Mobile.Core.Assignments;assembly=UniversitySchedule.Mobile.Core"
+    x:DataType="assignments:AssignmentsPageViewModel"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
     Shell.NavBarIsVisible="False"
     Title="Задания">
-    <VerticalStackLayout Padding="16,24" Spacing="16">
-        <Grid ColumnDefinitions="*,Auto">
-            <Label
-                Grid.Column="0"
-                Style="{StaticResource PageTitle}"
-                Text="Задания"
-                VerticalOptions="Center" />
+    <Grid Padding="16,24,16,32" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="14">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <Label Style="{StaticResource PageTitle}" Text="Задания" VerticalOptions="Center" />
             <Button
                 Grid.Column="1"
-                IsEnabled="False"
-                SemanticProperties.Description="Добавить задание; станет доступно после настройки профиля"
+                Clicked="OnAddAssignmentClicked"
+                SemanticProperties.Description="Добавить задание"
                 Style="{StaticResource CompactAddButton}"
                 Text="+" />
         </Grid>
-        <Border Style="{StaticResource Card}">
-            <VerticalStackLayout Spacing="6">
-                <Label Style="{StaticResource SecondaryText}" Text="Здесь будут храниться личные домашние задания и дедлайны." />
-                <Label Style="{StaticResource SecondaryText}" Text="Добавление станет доступно после выбора учебного профиля." />
+
+        <Border Grid.Row="1" Style="{StaticResource Card}">
+            <VerticalStackLayout Spacing="10">
+                <Label Style="{StaticResource SectionTitle}" Text="{Binding ProgressText}" />
+                <ProgressBar Progress="{Binding Progress}" ProgressColor="{StaticResource Success}" />
+                <Label Style="{StaticResource SecondaryText}" Text="Личные задания на этом устройстве" />
             </VerticalStackLayout>
         </Border>
-    </VerticalStackLayout>
+
+        <ScrollView Grid.Row="2" HorizontalScrollBarVisibility="Never" Orientation="Horizontal">
+            <HorizontalStackLayout Spacing="8">
+                <Button Command="{Binding ShowAllCommand}" Style="{StaticResource SegmentButton}" Text="Все">
+                    <Button.Triggers>
+                        <DataTrigger Binding="{Binding IsAllFilter}" TargetType="Button" Value="True">
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                            <Setter Property="TextColor" Value="White" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button Command="{Binding ShowTodayCommand}" Style="{StaticResource SegmentButton}" Text="Сегодня">
+                    <Button.Triggers>
+                        <DataTrigger Binding="{Binding IsTodayFilter}" TargetType="Button" Value="True">
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                            <Setter Property="TextColor" Value="White" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button Command="{Binding ShowWeekCommand}" Style="{StaticResource SegmentButton}" Text="На неделе">
+                    <Button.Triggers>
+                        <DataTrigger Binding="{Binding IsWeekFilter}" TargetType="Button" Value="True">
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                            <Setter Property="TextColor" Value="White" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button Command="{Binding ShowCompletedCommand}" Style="{StaticResource SegmentButton}" Text="Выполнено">
+                    <Button.Triggers>
+                        <DataTrigger Binding="{Binding IsCompletedFilter}" TargetType="Button" Value="True">
+                            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                            <Setter Property="TextColor" Value="White" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+            </HorizontalStackLayout>
+        </ScrollView>
+
+        <Grid Grid.Row="3">
+            <CollectionView
+                x:Name="AssignmentsCollection"
+                IsVisible="{Binding HasAssignments}"
+                ItemsSource="{Binding Assignments}"
+                SelectionChanged="OnAssignmentSelectionChanged"
+                SelectionMode="Single">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="assignments:AssignmentListItem">
+                        <SwipeView>
+                            <SwipeView.RightItems>
+                                <SwipeItems Mode="Reveal">
+                                    <SwipeItem
+                                        BackgroundColor="{StaticResource BrandPrimaryLight}"
+                                        CommandParameter="{Binding Id}"
+                                        Invoked="OnEditAssignmentInvoked"
+                                        Text="Изменить" />
+                                    <SwipeItem
+                                        BackgroundColor="{StaticResource DangerLight}"
+                                        CommandParameter="{Binding Id}"
+                                        Invoked="OnDeleteAssignmentInvoked"
+                                        Text="Удалить" />
+                                </SwipeItems>
+                            </SwipeView.RightItems>
+                            <Border Margin="0,0,0,10" Style="{StaticResource Card}">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                    <Button
+                                        CommandParameter="{Binding Id}"
+                                        Clicked="OnToggleCompletedClicked"
+                                        FontSize="22"
+                                        HeightRequest="44"
+                                        Padding="0"
+                                        Style="{StaticResource IconButton}"
+                                        Text="{Binding CompletionGlyph}" />
+                                    <VerticalStackLayout Grid.Column="1" Spacing="3">
+                                        <Label LineBreakMode="TailTruncation" MaxLines="2" Style="{StaticResource SectionTitle}" Text="{Binding Text}">
+                                            <Label.Triggers>
+                                                <DataTrigger Binding="{Binding IsCompleted}" TargetType="Label" Value="True">
+                                                    <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+                                        <Label Style="{StaticResource SecondaryText}" Text="{Binding Subject}" />
+                                    </VerticalStackLayout>
+                                    <VerticalStackLayout Grid.Column="2" HorizontalOptions="End" Spacing="3">
+                                        <Label HorizontalTextAlignment="End" Text="{Binding DeadlineText}">
+                                            <Label.Triggers>
+                                                <DataTrigger Binding="{Binding IsOverdue}" TargetType="Label" Value="True">
+                                                    <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource WarningLight}, Dark={StaticResource WarningDark}}" />
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+                                        <Label HorizontalTextAlignment="End" Style="{StaticResource SecondaryText}" Text="{Binding StatusText}" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                            </Border>
+                        </SwipeView>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <Border IsVisible="{Binding HasNoAssignments}" Style="{StaticResource Card}" VerticalOptions="Start">
+                <VerticalStackLayout Spacing="6">
+                    <Label Style="{StaticResource SectionTitle}" Text="Заданий пока нет" />
+                    <Label Style="{StaticResource SecondaryText}" Text="Нажмите +, выберите пару и добавьте домашнее задание. Оно останется доступно без интернета." />
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+    </Grid>
 </ContentPage>

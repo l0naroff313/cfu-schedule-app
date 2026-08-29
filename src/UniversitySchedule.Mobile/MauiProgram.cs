@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using UniversitySchedule.Mobile.Core.Assignments;
 using UniversitySchedule.Mobile.Core.Catalog;
 using UniversitySchedule.Mobile.Core.Cfu;
 using UniversitySchedule.Mobile.Core.Notes;
@@ -28,6 +29,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<UniversitySchedule.Mobile.Core.Storage.ILocalDataStore, SqliteLocalDataStore>();
         builder.Services.AddSingleton<IReferenceCatalogProvider, EmbeddedReferenceCatalogProvider>();
         builder.Services.AddSingleton<PersonalNoteStore>();
+        builder.Services.AddSingleton<PersonalAssignmentStore>();
         builder.Services.AddSingleton<ThemeSettingsService>();
         builder.Services.AddSingleton<AcademicProfileStore>();
         builder.Services.AddSingleton(_ =>
@@ -46,6 +48,7 @@ public static class MauiProgram
         builder.Services.AddTransient<TodayPageViewModel>();
         builder.Services.AddTransient<SchedulePageViewModel>();
         builder.Services.AddTransient<NotesPageViewModel>();
+        builder.Services.AddTransient<AssignmentsPageViewModel>();
         builder.Services.AddTransient<TodayPage>();
         builder.Services.AddTransient<SchedulePage>();
         builder.Services.AddTransient<AssignmentsPage>();
@@ -53,6 +56,8 @@ public static class MauiProgram
         builder.Services.AddTransient<ProfilePage>();
         builder.Services.AddTransient<ProfileSetupPage>();
         builder.Services.AddTransient<SettingsPage>();
+        builder.Services.AddTransient<NoteEditorPage>();
+        builder.Services.AddTransient<AssignmentEditorPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

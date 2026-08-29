@@ -19,6 +19,11 @@ public partial class SettingsPage : ContentPage
 
     private void OnDarkThemeClicked(object? sender, EventArgs e) => SetTheme(AppTheme.Dark);
 
+    private async void OnCloseClicked(object? sender, EventArgs e)
+    {
+        await Navigation.PopModalAsync();
+    }
+
     private void SetTheme(AppTheme theme)
     {
         _themeSettings.SetTheme(theme);

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using UniversitySchedule.Mobile.Core.Scheduling;
 
 namespace UniversitySchedule.Mobile.Pages;
@@ -5,12 +6,14 @@ namespace UniversitySchedule.Mobile.Pages;
 public partial class SchedulePage : ContentPage
 {
     private readonly SchedulePageViewModel _viewModel;
+    private readonly IServiceProvider _services;
     private CancellationTokenSource? _refreshCancellation;
 
-    public SchedulePage(SchedulePageViewModel viewModel)
+    public SchedulePage(SchedulePageViewModel viewModel, IServiceProvider services)
     {
         InitializeComponent();
         _viewModel = viewModel;
+        _services = services;
         BindingContext = viewModel;
     }
 
@@ -66,6 +69,56 @@ public partial class SchedulePage : ContentPage
         }
         catch (OperationCanceledException)
         {
+        }
+    }
+
+    private async void OnLessonTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not TapGestureRecognizer { CommandParameter: ScheduleLessonListItem lesson })
+        {
+            return;
+        }
+
+        await OpenLessonActionsAsync(lesson);
+    }
+
+    private async void OnLessonActionClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { CommandParameter: ScheduleLessonListItem lesson })
+        {
+            await OpenLessonActionsAsync(lesson);
+        }
+    }
+
+    private async Task OpenLessonActionsAsync(ScheduleLessonListItem lesson)
+    {
+
+        string? action = await DisplayActionSheetAsync(
+            $"{lesson.PairText} • {lesson.Subject}",
+            "Отмена",
+            null,
+            "Добавить заметку",
+            "Добавить задание");
+        switch (action)
+        {
+            case "Добавить заметку":
+                var noteEditor = _services.GetRequiredService<NoteEditorPage>();
+                noteEditor.Configure(lessonId: lesson.Id);
+                await Navigation.PushModalAsync(noteEditor);
+                break;
+            case "Добавить задание":
+                var assignmentEditor = _services.GetRequiredService<AssignmentEditorPage>();
+                assignmentEditor.Configure(lessonId: lesson.Id);
+                await Navigation.PushModalAsync(assignmentEditor);
+                break;
+        }
+    }
+
+    private void OnDateTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is TapGestureRecognizer { CommandParameter: ScheduleDateItem date })
+        {
+            _viewModel.SelectDate(date.Date);
         }
     }
 

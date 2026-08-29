@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:viewModels="clr-namespace:UniversitySchedule.Mobile.Core.Scheduling;assembly=UniversitySchedule.Mobile.Core"
     x:DataType="viewModels:SchedulePageViewModel"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
     Shell.NavBarIsVisible="False"
     Title="Расписание">
     <ScrollView>
@@ -50,11 +51,13 @@
                 IsVisible="{Binding IsTeacherMode}"
                 Spacing="12">
                 <Label Style="{StaticResource SectionTitle}" Text="Выбор преподавателя" />
-                <SearchBar
-                    Placeholder="Найти преподавателя"
-                    SearchButtonPressed="OnTeacherSearchButtonPressed"
-                    SemanticProperties.Description="Поиск преподавателя"
-                    Text="{Binding TeacherQuery}" />
+                <Border Padding="0" Style="{StaticResource InputBorder}">
+                    <SearchBar
+                        Placeholder="Найти преподавателя"
+                        SearchButtonPressed="OnTeacherSearchButtonPressed"
+                        SemanticProperties.Description="Поиск преподавателя"
+                        Text="{Binding TeacherQuery}" />
+                </Border>
                 <Border
                     IsVisible="{Binding HasTeacherOptions}"
                     Style="{StaticResource Card}">
@@ -122,6 +125,79 @@
                 </Grid>
             </Border>
 
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6">
+                <Button
+                    Command="{Binding PreviousPeriodCommand}"
+                    SemanticProperties.Description="Предыдущий период"
+                    Style="{StaticResource IconButton}"
+                    Text="‹" />
+                <Label
+                    Grid.Column="1"
+                    HorizontalTextAlignment="Center"
+                    Style="{StaticResource SectionTitle}"
+                    Text="{Binding PeriodText}"
+                    VerticalTextAlignment="Center" />
+                <Button
+                    Grid.Column="2"
+                    Command="{Binding GoTodayCommand}"
+                    FontSize="12"
+                    HeightRequest="40"
+                    Padding="10,6"
+                    Style="{StaticResource SegmentButton}"
+                    Text="Сегодня" />
+                <Button
+                    Grid.Column="3"
+                    Command="{Binding NextPeriodCommand}"
+                    SemanticProperties.Description="Следующий период"
+                    Style="{StaticResource IconButton}"
+                    Text="›" />
+            </Grid>
+
+            <CollectionView
+                HeightRequest="64"
+                HorizontalScrollBarVisibility="Never"
+                ItemsSource="{Binding WeekDates}"
+                ItemsLayout="HorizontalList"
+                SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:ScheduleDateItem">
+                        <Border
+                            Margin="2,0"
+                            Padding="6,7"
+                            BackgroundColor="Transparent"
+                            Stroke="{AppThemeBinding Light={StaticResource OutlineLight}, Dark={StaticResource OutlineDark}}"
+                            StrokeShape="RoundRectangle 10"
+                            WidthRequest="44">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnDateTapped" />
+                            </Border.GestureRecognizers>
+                            <Border.Triggers>
+                                <DataTrigger Binding="{Binding IsSelected}" TargetType="Border" Value="True">
+                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                                    <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <VerticalStackLayout Spacing="1">
+                                <Label HorizontalTextAlignment="Center" Style="{StaticResource SecondaryText}" Text="{Binding DayText}">
+                                    <Label.Triggers>
+                                        <DataTrigger Binding="{Binding IsSelected}" TargetType="Label" Value="True">
+                                            <Setter Property="TextColor" Value="White" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                                <Label HorizontalTextAlignment="Center" Style="{StaticResource SectionTitle}" Text="{Binding DateText}">
+                                    <Label.Triggers>
+                                        <DataTrigger Binding="{Binding IsSelected}" TargetType="Label" Value="True">
+                                            <Setter Property="TextColor" Value="White" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
             <HorizontalStackLayout Spacing="8">
                 <ActivityIndicator
                     IsRunning="{Binding IsLoading}"
@@ -136,8 +212,19 @@
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="viewModels:ScheduleLessonListItem">
                         <Border Style="{StaticResource Card}">
+                            <Border.Triggers>
+                                <DataTrigger Binding="{Binding IsCurrent}" TargetType="Border" Value="True">
+                                    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}" />
+                                    <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    CommandParameter="{Binding .}"
+                                    Tapped="OnLessonTapped" />
+                            </Border.GestureRecognizers>
                             <Grid
-                                ColumnDefinitions="Auto,*"
+                                ColumnDefinitions="Auto,*,Auto"
                                 ColumnSpacing="14"
                                 RowDefinitions="Auto,Auto,Auto,Auto">
                                 <Border
@@ -161,6 +248,14 @@
                                     Grid.Column="1"
                                     Style="{StaticResource SecondaryText}"
                                     Text="{Binding DateText}" />
+                                <Button
+                                    Grid.Column="2"
+                                    Grid.RowSpan="2"
+                                    CommandParameter="{Binding .}"
+                                    Clicked="OnLessonActionClicked"
+                                    SemanticProperties.Description="Действия с занятием"
+                                    Style="{StaticResource IconButton}"
+                                    Text="⋯" />
                                 <Label
                                     Grid.Row="1"
                                     Grid.Column="1"
@@ -176,6 +271,7 @@
                                 <VerticalStackLayout
                                     Grid.Row="3"
                                     Grid.Column="1"
+                                    Grid.ColumnSpan="2"
                                     Spacing="2">
                                     <Label Text="{Binding Location}" />
                                     <Label

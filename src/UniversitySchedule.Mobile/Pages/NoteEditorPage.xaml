@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniversitySchedule.Mobile.Pages.NoteEditorPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+    Shell.NavBarIsVisible="False"
+    Title="Редактор заметки">
+    <Grid Padding="16,20,16,24" RowDefinitions="Auto,*,Auto" RowSpacing="16">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+            <Button
+                Clicked="OnCloseClicked"
+                SemanticProperties.Description="Закрыть редактор"
+                Style="{StaticResource IconButton}"
+                Text="‹" />
+            <Label
+                Grid.Column="1"
+                Style="{StaticResource PageTitle}"
+                Text="Заметка"
+                VerticalOptions="Center" />
+            <Button
+                Grid.Column="2"
+                Clicked="OnSaveClicked"
+                Style="{StaticResource HeaderActionButton}"
+                Text="Сохранить" />
+        </Grid>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="14">
+                <Label Style="{StaticResource SecondaryText}" Text="Название" />
+                <Border Style="{StaticResource InputBorder}">
+                    <Entry x:Name="TitleEntry" MaxLength="120" Placeholder="Например, формулы к зачёту" />
+                </Border>
+
+                <Label Style="{StaticResource SecondaryText}" Text="Пара" />
+                <Border Style="{StaticResource InputBorder}">
+                    <Picker
+                        x:Name="LessonPicker"
+                        SelectedIndexChanged="OnLessonSelected"
+                        Title="Выберите занятие" />
+                </Border>
+
+                <Label Style="{StaticResource SecondaryText}" Text="Предмет" />
+                <Border Style="{StaticResource InputBorder}">
+                    <Entry x:Name="SubjectEntry" MaxLength="160" Placeholder="Предмет (необязательно)" />
+                </Border>
+
+                <Label Style="{StaticResource SecondaryText}" Text="Текст" />
+                <Border Padding="12" Style="{StaticResource InputBorder}">
+                    <Editor
+                        x:Name="TextEditor"
+                        AutoSize="TextChanges"
+                        HeightRequest="220"
+                        MaxLength="4000"
+                        Placeholder="Что важно запомнить?" />
+                </Border>
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Закрепить заметку" />
+                        <Label Style="{StaticResource SecondaryText}" Text="Закреплённые заметки показываются первыми." />
+                    </VerticalStackLayout>
+                    <Switch x:Name="PinnedSwitch" Grid.Column="1" />
+                </Grid>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Button
+            x:Name="DeleteButton"
+            Grid.Row="2"
+            Clicked="OnDeleteClicked"
+            IsVisible="False"
+            Style="{StaticResource DangerButton}"
+            Text="Удалить заметку" />
+    </Grid>
+</ContentPage>

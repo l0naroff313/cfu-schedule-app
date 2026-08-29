@@ -3,34 +3,91 @@
     x:Class="UniversitySchedule.Mobile.Pages.ProfilePage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
     Shell.NavBarIsVisible="False"
     Title="Профиль">
-    <VerticalStackLayout Padding="16,24" Spacing="16">
-        <Grid ColumnDefinitions="*,Auto">
-            <Label Style="{StaticResource PageTitle}" Text="Профиль" VerticalOptions="Center" />
-            <Button
-                Grid.Column="1"
-                BackgroundColor="Transparent"
-                Clicked="OnSettingsClicked"
-                FontSize="24"
-                HeightRequest="44"
-                MinimumHeightRequest="44"
-                MinimumWidthRequest="44"
-                Padding="0"
-                SemanticProperties.Description="Открыть настройки"
-                Text="⚙"
-                TextColor="{AppThemeBinding Light={StaticResource PrimaryTextLight}, Dark={StaticResource PrimaryTextDark}}"
-                WidthRequest="44" />
-        </Grid>
-        <Border Style="{StaticResource Card}">
-            <VerticalStackLayout Spacing="8">
-                <Label Style="{StaticResource SectionTitle}" Text="КФУ им. В. И. Вернадского" />
-                <Label x:Name="InstituteLabel" Style="{StaticResource SecondaryText}" Text="Учебный профиль пока не настроен." />
-                <Label x:Name="DirectionLabel" />
-                <Label x:Name="GroupLabel" Style="{StaticResource SectionTitle}" />
-                <Label x:Name="SyncLabel" Style="{StaticResource SecondaryText}" />
-            </VerticalStackLayout>
-        </Border>
-        <Button Clicked="OnChangeProfileClicked" Text="Изменить учебную группу" />
-    </VerticalStackLayout>
+    <ScrollView>
+        <VerticalStackLayout Padding="16,24,16,32" Spacing="14">
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Style="{StaticResource PageTitle}" Text="Профиль" VerticalOptions="Center" />
+                <Button
+                    Grid.Column="1"
+                    Clicked="OnSettingsClicked"
+                    SemanticProperties.Description="Открыть настройки"
+                    Style="{StaticResource IconButton}"
+                    Text="⚙" />
+            </Grid>
+
+            <Border Style="{StaticResource Card}">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                    <Border
+                        HeightRequest="72"
+                        WidthRequest="72"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}"
+                        StrokeThickness="0"
+                        StrokeShape="RoundRectangle 36">
+                        <Label
+                            FontFamily="OpenSansSemibold"
+                            FontSize="20"
+                            HorizontalTextAlignment="Center"
+                            Text="КФУ"
+                            TextColor="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}"
+                            VerticalTextAlignment="Center" />
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                        <Label x:Name="ProfileNameLabel" Style="{StaticResource SectionTitle}" Text="Учебный профиль" />
+                        <Label x:Name="GroupLabel" />
+                        <Label x:Name="DirectionLabel" Style="{StaticResource SecondaryText}" />
+                        <Label x:Name="InstituteLabel" LineBreakMode="TailTruncation" MaxLines="2" Style="{StaticResource SecondaryText}" />
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <Grid ColumnDefinitions="*,1,*" ColumnSpacing="16">
+                    <VerticalStackLayout Spacing="3">
+                        <Label x:Name="AssignmentCountLabel" FontFamily="OpenSansSemibold" FontSize="24" Text="0" />
+                        <Label Style="{StaticResource SecondaryText}" Text="заданий всего" />
+                    </VerticalStackLayout>
+                    <BoxView Grid.Column="1" BackgroundColor="{AppThemeBinding Light={StaticResource OutlineLight}, Dark={StaticResource OutlineDark}}" />
+                    <VerticalStackLayout Grid.Column="2" Spacing="3">
+                        <Label x:Name="CompletionLabel" FontFamily="OpenSansSemibold" FontSize="24" Text="0%" />
+                        <Label Style="{StaticResource SecondaryText}" Text="выполнено" />
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="0">
+                    <Grid Padding="0,8" ColumnDefinitions="Auto,*,Auto">
+                        <Label FontSize="20" Text="⌂" />
+                        <Label Grid.Column="1" Margin="12,0" Text="Учебный профиль" VerticalTextAlignment="Center" />
+                        <Label Grid.Column="2" Text="›" VerticalTextAlignment="Center" />
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnAcademicProfileClicked" />
+                        </Grid.GestureRecognizers>
+                    </Grid>
+                    <BoxView HeightRequest="1" BackgroundColor="{AppThemeBinding Light={StaticResource OutlineLight}, Dark={StaticResource OutlineDark}}" />
+                    <Grid Padding="0,8" ColumnDefinitions="Auto,*,Auto">
+                        <Label FontSize="20" Text="◐" />
+                        <Label Grid.Column="1" Margin="12,0" Text="Оформление" VerticalTextAlignment="Center" />
+                        <Label Grid.Column="2" Text="›" VerticalTextAlignment="Center" />
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnAppearanceClicked" />
+                        </Grid.GestureRecognizers>
+                    </Grid>
+                    <BoxView HeightRequest="1" BackgroundColor="{AppThemeBinding Light={StaticResource OutlineLight}, Dark={StaticResource OutlineDark}}" />
+                    <Grid Padding="0,8" ColumnDefinitions="Auto,*">
+                        <Label FontSize="20" Text="↻" />
+                        <VerticalStackLayout Grid.Column="1" Margin="12,0" Spacing="2">
+                            <Label Text="Синхронизация" />
+                            <Label x:Name="SyncLabel" Style="{StaticResource SecondaryText}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Button Clicked="OnChangeProfileClicked" Text="Изменить учебную группу" />
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>

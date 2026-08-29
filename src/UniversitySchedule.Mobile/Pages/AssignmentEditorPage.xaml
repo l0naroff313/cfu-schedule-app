@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniversitySchedule.Mobile.Pages.AssignmentEditorPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+    Shell.NavBarIsVisible="False"
+    Title="Редактор задания">
+    <Grid Padding="16,20,16,24" RowDefinitions="Auto,*,Auto" RowSpacing="16">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+            <Button
+                Clicked="OnCloseClicked"
+                SemanticProperties.Description="Закрыть редактор"
+                Style="{StaticResource IconButton}"
+                Text="‹" />
+            <Label
+                Grid.Column="1"
+                Style="{StaticResource PageTitle}"
+                Text="Задание"
+                VerticalOptions="Center" />
+            <Button
+                Grid.Column="2"
+                Clicked="OnSaveClicked"
+                Style="{StaticResource HeaderActionButton}"
+                Text="Сохранить" />
+        </Grid>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="14">
+                <Label Style="{StaticResource SecondaryText}" Text="Пара" />
+                <Border Style="{StaticResource InputBorder}">
+                    <Picker
+                        x:Name="LessonPicker"
+                        SelectedIndexChanged="OnLessonSelected"
+                        Title="Выберите занятие" />
+                </Border>
+
+                <Label Style="{StaticResource SecondaryText}" Text="Предмет" />
+                <Border Style="{StaticResource InputBorder}">
+                    <Entry x:Name="SubjectEntry" MaxLength="160" Placeholder="Название предмета" />
+                </Border>
+
+                <Label Style="{StaticResource SecondaryText}" Text="Что нужно сделать" />
+                <Border Padding="12" Style="{StaticResource InputBorder}">
+                    <Editor
+                        x:Name="TextEditor"
+                        AutoSize="TextChanges"
+                        HeightRequest="160"
+                        MaxLength="4000"
+                        Placeholder="Опишите домашнее задание" />
+                </Border>
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="Добавить дедлайн" />
+                        <Label Style="{StaticResource SecondaryText}" Text="Дата и время сохраняются локально." />
+                    </VerticalStackLayout>
+                    <Switch x:Name="UseDeadlineSwitch" Grid.Column="1" Toggled="OnUseDeadlineToggled" />
+                </Grid>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Border Style="{StaticResource InputBorder}">
+                        <DatePicker x:Name="DeadlineDatePicker" Format="dd.MM.yyyy" IsEnabled="False" />
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource InputBorder}">
+                        <TimePicker x:Name="DeadlineTimePicker" Format="HH:mm" IsEnabled="False" />
+                    </Border>
+                </Grid>
+
+                <Label Style="{StaticResource SecondaryText}" Text="Статус" />
+                <Border Style="{StaticResource InputBorder}">
+                    <Picker x:Name="StatusPicker" Title="Выберите статус" />
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Button
+            x:Name="DeleteButton"
+            Grid.Row="2"
+            Clicked="OnDeleteClicked"
+            IsVisible="False"
+            Style="{StaticResource DangerButton}"
+            Text="Удалить задание" />
+    </Grid>
+</ContentPage>

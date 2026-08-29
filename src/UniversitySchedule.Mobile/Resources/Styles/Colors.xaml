@@ -20,6 +20,12 @@
     <Color x:Key="Success">#82D21E</Color>
     <Color x:Key="DangerLight">#E5484D</Color>
     <Color x:Key="DangerDark">#FF6B61</Color>
+    <Color x:Key="AccentSoftLight">#EAF2FF</Color>
+    <Color x:Key="AccentSoftDark">#0A2A50</Color>
+    <Color x:Key="SuccessSoftLight">#EEF9DD</Color>
+    <Color x:Key="SuccessSoftDark">#15331D</Color>
+    <Color x:Key="WarningLight">#E75B35</Color>
+    <Color x:Key="WarningDark">#FF7655</Color>
     <Color x:Key="White">#FFFFFF</Color>
 
 </ResourceDictionary>
