@@ -15,6 +15,8 @@ public sealed class ProfileSetupViewModel(
     CfuScheduleRepository scheduleRepository,
     ScheduleSession scheduleSession) : ObservableObject
 {
+    private const string DefaultGroupCode = "ПИ-б-о-252";
+
     private readonly CfuScheduleRepository _scheduleRepository = scheduleRepository
         ?? throw new ArgumentNullException(nameof(scheduleRepository));
     private readonly ScheduleSession _scheduleSession = scheduleSession
@@ -226,21 +228,46 @@ public sealed class ProfileSetupViewModel(
 
     private void RestoreSelection(AcademicProfile? profile)
     {
-        SelectedInstitute = profile is null
-            ? null
-            : Institutes.FirstOrDefault(item => item.Id == profile.InstituteId);
-        SelectedDirection = profile is null
-            ? null
-            : Directions.FirstOrDefault(item => item.Id == profile.DirectionId);
-        SelectedCourse = profile?.CourseNumber;
-        SelectedGroup = profile is null
-            ? null
-            : Groups.FirstOrDefault(item => item.Id == profile.GroupId);
-        SelectedSubgroup = profile?.SubgroupName is null
+        if (profile is null)
+        {
+            SelectDefaultGroup();
+            return;
+        }
+
+        SelectedInstitute = Institutes.FirstOrDefault(item => item.Id == profile.InstituteId);
+        SelectedDirection = Directions.FirstOrDefault(item => item.Id == profile.DirectionId);
+        SelectedCourse = profile.CourseNumber;
+        SelectedGroup = Groups.FirstOrDefault(item => item.Id == profile.GroupId);
+        SelectedSubgroup = profile.SubgroupName is null
             ? Subgroups[0]
             : Subgroups.FirstOrDefault(item =>
                 item.Number is not null && profile.SubgroupName.StartsWith(item.Number.Value.ToString()))
               ?? Subgroups[0];
+    }
+
+    private void SelectDefaultGroup()
+    {
+        StudyGroupSummary? group = _catalog?.Groups.FirstOrDefault(item =>
+            string.Equals(item.Name, DefaultGroupCode, StringComparison.OrdinalIgnoreCase));
+        DirectionSummary? direction = group is null
+            ? null
+            : _catalog!.Directions.FirstOrDefault(item => item.Id == group.DirectionId);
+        InstituteSummary? institute = direction is null
+            ? null
+            : _catalog!.Institutes.FirstOrDefault(item => item.Id == direction.InstituteId);
+
+        if (group is null || direction is null || institute is null)
+        {
+            SelectedSubgroup = Subgroups[0];
+            return;
+        }
+
+        SelectedInstitute = institute;
+        SelectedDirection = Directions.FirstOrDefault(item => item.Id == direction.Id);
+        SelectedCourse = group.CourseNumber;
+        SelectedGroup = Groups.FirstOrDefault(item => item.Id == group.Id);
+        SelectedSubgroup = Subgroups[0];
+        StatusText = $"Группа {DefaultGroupCode} выбрана по умолчанию.";
     }
 
     private void PopulateDirections()
