@@ -1,6 +1,9 @@
 using Microsoft.Extensions.Logging;
+using UniversitySchedule.Mobile.Core.Cfu;
+using UniversitySchedule.Mobile.Core.Profiles;
 using UniversitySchedule.Mobile.Core.Scheduling;
 using UniversitySchedule.Mobile.Pages;
+using UniversitySchedule.Mobile.Storage;
 
 namespace UniversitySchedule.Mobile;
 
@@ -19,12 +22,29 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+        builder.Services.AddSingleton<UniversitySchedule.Mobile.Core.Storage.ILocalDataStore, SqliteLocalDataStore>();
+        builder.Services.AddSingleton<AcademicProfileStore>();
+        builder.Services.AddSingleton(_ =>
+        {
+            var client = new HttpClient
+            {
+                BaseAddress = new Uri(CfuScheduleRepository.BaseAddress),
+                Timeout = TimeSpan.FromSeconds(15),
+            };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("CFU-ElJournal/1.0");
+            return client;
+        });
+        builder.Services.AddSingleton<CfuScheduleRepository>();
+        builder.Services.AddSingleton<ScheduleSession>();
+        builder.Services.AddTransient<ProfileSetupViewModel>();
+        builder.Services.AddTransient<TodayPageViewModel>();
         builder.Services.AddTransient<SchedulePageViewModel>();
         builder.Services.AddTransient<TodayPage>();
         builder.Services.AddTransient<SchedulePage>();
         builder.Services.AddTransient<AssignmentsPage>();
         builder.Services.AddTransient<NotesPage>();
         builder.Services.AddTransient<ProfilePage>();
+        builder.Services.AddTransient<ProfileSetupPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

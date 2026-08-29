@@ -10,8 +10,12 @@
         <Border Style="{StaticResource Card}">
             <VerticalStackLayout Spacing="8">
                 <Label Style="{StaticResource SectionTitle}" Text="КФУ им. В. И. Вернадского" />
-                <Label Style="{StaticResource SecondaryText}" Text="Учебный профиль пока не настроен." />
+                <Label x:Name="InstituteLabel" Style="{StaticResource SecondaryText}" Text="Учебный профиль пока не настроен." />
+                <Label x:Name="DirectionLabel" />
+                <Label x:Name="GroupLabel" Style="{StaticResource SectionTitle}" />
+                <Label x:Name="SyncLabel" Style="{StaticResource SecondaryText}" />
             </VerticalStackLayout>
         </Border>
+        <Button Clicked="OnChangeProfileClicked" Text="Изменить учебную группу" />
     </VerticalStackLayout>
 </ContentPage>

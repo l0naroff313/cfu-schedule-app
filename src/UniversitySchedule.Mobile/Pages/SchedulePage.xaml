@@ -52,6 +52,7 @@
                 <Label Style="{StaticResource SectionTitle}" Text="Выбор преподавателя" />
                 <SearchBar
                     Placeholder="Найти преподавателя"
+                    SearchButtonPressed="OnTeacherSearchButtonPressed"
                     SemanticProperties.Description="Поиск преподавателя"
                     Text="{Binding TeacherQuery}" />
                 <Border
@@ -121,7 +122,77 @@
                 </Grid>
             </Border>
 
-            <Border Style="{StaticResource Card}">
+            <HorizontalStackLayout Spacing="8">
+                <ActivityIndicator
+                    IsRunning="{Binding IsLoading}"
+                    IsVisible="{Binding IsLoading}" />
+                <Label Style="{StaticResource SecondaryText}" Text="{Binding SyncStatusText}" />
+            </HorizontalStackLayout>
+
+            <VerticalStackLayout
+                BindableLayout.ItemsSource="{Binding Lessons}"
+                IsVisible="{Binding HasLessons}"
+                Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:ScheduleLessonListItem">
+                        <Border Style="{StaticResource Card}">
+                            <Grid
+                                ColumnDefinitions="Auto,*"
+                                ColumnSpacing="14"
+                                RowDefinitions="Auto,Auto,Auto,Auto">
+                                <Border
+                                    Grid.RowSpan="4"
+                                    Padding="10,8"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource SegmentTrackLight}, Dark={StaticResource SegmentTrackDark}}"
+                                    StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 10">
+                                    <VerticalStackLayout HorizontalOptions="Center" Spacing="2">
+                                        <Label
+                                            HorizontalTextAlignment="Center"
+                                            Style="{StaticResource SectionTitle}"
+                                            Text="{Binding PairText}" />
+                                        <Label
+                                            HorizontalTextAlignment="Center"
+                                            Style="{StaticResource SecondaryText}"
+                                            Text="{Binding TimeText}" />
+                                    </VerticalStackLayout>
+                                </Border>
+                                <Label
+                                    Grid.Column="1"
+                                    Style="{StaticResource SecondaryText}"
+                                    Text="{Binding DateText}" />
+                                <Label
+                                    Grid.Row="1"
+                                    Grid.Column="1"
+                                    LineBreakMode="TailTruncation"
+                                    MaxLines="2"
+                                    Style="{StaticResource SectionTitle}"
+                                    Text="{Binding Subject}" />
+                                <Label
+                                    Grid.Row="2"
+                                    Grid.Column="1"
+                                    Style="{StaticResource SecondaryText}"
+                                    Text="{Binding Details}" />
+                                <VerticalStackLayout
+                                    Grid.Row="3"
+                                    Grid.Column="1"
+                                    Spacing="2">
+                                    <Label Text="{Binding Location}" />
+                                    <Label
+                                        LineBreakMode="TailTruncation"
+                                        MaxLines="2"
+                                        Style="{StaticResource SecondaryText}"
+                                        Text="{Binding Teachers}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <Border
+                IsVisible="{Binding HasNoLessons}"
+                Style="{StaticResource Card}">
                 <Label Style="{StaticResource SecondaryText}" Text="{Binding ScheduleEmptyText}" />
             </Border>
         </VerticalStackLayout>

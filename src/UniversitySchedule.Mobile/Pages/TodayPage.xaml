@@ -3,18 +3,57 @@
     x:Class="UniversitySchedule.Mobile.Pages.TodayPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewModels="clr-namespace:UniversitySchedule.Mobile.Core.Scheduling;assembly=UniversitySchedule.Mobile.Core"
+    x:DataType="viewModels:TodayPageViewModel"
     Shell.NavBarIsVisible="False"
     Title="Сегодня">
     <ScrollView>
-        <VerticalStackLayout Padding="16,24" Spacing="16">
-            <Label Style="{StaticResource PageTitle}" Text="Сегодня" />
-            <Border Style="{StaticResource Card}">
-                <VerticalStackLayout Spacing="8">
-                    <Label Style="{StaticResource SectionTitle}" Text="Учебный профиль не выбран" />
-                    <Label
-                        Style="{StaticResource SecondaryText}"
-                        Text="После выбора института, направления, группы и подгруппы здесь появятся текущая и следующая пары." />
+        <VerticalStackLayout Padding="16,24,16,32" Spacing="16">
+            <Grid ColumnDefinitions="*,Auto">
+                <VerticalStackLayout Spacing="2">
+                    <Label Style="{StaticResource PageTitle}" Text="Сегодня" />
+                    <Label Style="{StaticResource SecondaryText}" Text="{Binding GroupText}" />
                 </VerticalStackLayout>
+                <ActivityIndicator
+                    Grid.Column="1"
+                    IsRunning="{Binding IsLoading}"
+                    IsVisible="{Binding IsLoading}" />
+            </Grid>
+
+            <Border
+                IsVisible="{Binding HasCurrentLesson}"
+                Style="{StaticResource Card}">
+                <VerticalStackLayout BindingContext="{Binding CurrentLesson}" Spacing="7">
+                    <Label Style="{StaticResource SecondaryText}" Text="{Binding Caption}" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Style="{StaticResource SectionTitle}" Text="{Binding Subject}" />
+                        <Label Grid.Column="1" Style="{StaticResource SectionTitle}" Text="{Binding PairText}" />
+                    </Grid>
+                    <Label Text="{Binding TimeText}" />
+                    <Label Style="{StaticResource SecondaryText}" Text="{Binding Details}" />
+                    <Label Text="{Binding Location}" />
+                    <Label Style="{StaticResource SecondaryText}" Text="{Binding Teachers}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border
+                IsVisible="{Binding HasNextLesson}"
+                Style="{StaticResource Card}">
+                <VerticalStackLayout BindingContext="{Binding NextLesson}" Spacing="7">
+                    <Label Style="{StaticResource SecondaryText}" Text="{Binding Caption}" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Style="{StaticResource SectionTitle}" Text="{Binding Subject}" />
+                        <Label Grid.Column="1" Style="{StaticResource SectionTitle}" Text="{Binding PairText}" />
+                    </Grid>
+                    <Label Text="{Binding TimeText}" />
+                    <Label Style="{StaticResource SecondaryText}" Text="{Binding Details}" />
+                    <Label Text="{Binding Location}" />
+                    <Label Style="{StaticResource SecondaryText}" Text="{Binding Teachers}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <Label Style="{StaticResource SecondaryText}" Text="{Binding StatusText}" />
             </Border>
         </VerticalStackLayout>
     </ScrollView>

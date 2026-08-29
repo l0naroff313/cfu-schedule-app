@@ -1,13 +1,13 @@
-using UniversitySchedule.Mobile.Core.Scheduling;
+using UniversitySchedule.Mobile.Core.Profiles;
 
 namespace UniversitySchedule.Mobile.Pages;
 
-public partial class TodayPage : ContentPage
+public partial class ProfileSetupPage : ContentPage
 {
-    private readonly TodayPageViewModel _viewModel;
+    private readonly ProfileSetupViewModel _viewModel;
     private CancellationTokenSource? _loadCancellation;
 
-    public TodayPage(TodayPageViewModel viewModel)
+    public ProfileSetupPage(ProfileSetupViewModel viewModel)
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -31,11 +31,19 @@ public partial class TodayPage : ContentPage
         base.OnDisappearing();
     }
 
+    private async void OnSaveClicked(object? sender, EventArgs e)
+    {
+        if (await _viewModel.SaveAsync())
+        {
+            await Navigation.PopModalAsync();
+        }
+    }
+
     private async Task LoadAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await _viewModel.LoadAsync(cancellationToken);
+            await _viewModel.InitializeAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

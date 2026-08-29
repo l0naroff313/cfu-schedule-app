@@ -21,6 +21,7 @@ public partial class SchedulePage : ContentPage
         _viewModel.RefreshTeacherLocation();
 
         _refreshCancellation = new CancellationTokenSource();
+        _ = LoadAsync(_refreshCancellation.Token);
         _ = RefreshTeacherLocationAsync(_refreshCancellation.Token);
     }
 
@@ -42,6 +43,28 @@ public partial class SchedulePage : ContentPage
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task LoadAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _viewModel.LoadAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async void OnTeacherSearchButtonPressed(object? sender, EventArgs e)
+    {
+        try
+        {
+            await _viewModel.SearchTeachersAsync(_viewModel.TeacherQuery);
+        }
+        catch (OperationCanceledException)
         {
         }
     }
