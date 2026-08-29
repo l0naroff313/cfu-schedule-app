@@ -10,7 +10,7 @@ namespace UniversitySchedule.Mobile.Core.Tests.Profiles;
 public sealed class ProfileSetupViewModelTests
 {
     [Fact]
-    public async Task FirstLaunch_PreselectsPi252AndLeavesWholeGroupSelected()
+    public async Task FirstLaunch_PreselectsPi252FirstSubgroup()
     {
         const string indexJson = """
             {
@@ -41,7 +41,7 @@ public sealed class ProfileSetupViewModelTests
         Assert.Equal("09.03.04 Програмная инженерия", viewModel.SelectedDirection?.Name);
         Assert.Equal(2, viewModel.SelectedCourse);
         Assert.Equal("ПИ-б-о-252", viewModel.SelectedGroup?.Name);
-        Assert.Null(viewModel.SelectedSubgroup?.Number);
+        Assert.Equal(1, viewModel.SelectedSubgroup?.Number);
         Assert.True(viewModel.CanSave);
     }
 

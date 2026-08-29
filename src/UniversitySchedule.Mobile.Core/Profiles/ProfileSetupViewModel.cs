@@ -266,8 +266,8 @@ public sealed class ProfileSetupViewModel(
         SelectedDirection = Directions.FirstOrDefault(item => item.Id == direction.Id);
         SelectedCourse = group.CourseNumber;
         SelectedGroup = Groups.FirstOrDefault(item => item.Id == group.Id);
-        SelectedSubgroup = Subgroups[0];
-        StatusText = $"Группа {DefaultGroupCode} выбрана по умолчанию.";
+        SelectedSubgroup = Subgroups.First(item => item.Number == 1);
+        StatusText = $"Группа {DefaultGroupCode}, 1 подгруппа выбраны по умолчанию.";
     }
 
     private void PopulateDirections()
