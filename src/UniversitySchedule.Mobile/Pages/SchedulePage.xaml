@@ -74,18 +74,44 @@
                 <Border
                     IsVisible="{Binding HasSelectedTeacher}"
                     Style="{StaticResource Card}">
-                    <VerticalStackLayout Spacing="6">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Style="{StaticResource SectionTitle}" Text="{Binding SelectedTeacherProfile.FullName}" />
+                        <Label Style="{StaticResource SecondaryText}" Text="{Binding SelectedTeacherProfile.PositionText}" />
+                        <BoxView
+                            HeightRequest="1"
+                            Color="{AppThemeBinding Light={StaticResource OutlineLight}, Dark={StaticResource OutlineDark}}" />
                         <Label Style="{StaticResource SecondaryText}" Text="{Binding TeacherDetailLabel}" />
-                        <Label Style="{StaticResource SecondaryText}" Text="{Binding TeacherStatusTitle}" />
+                        <Label Style="{StaticResource SectionTitle}" Text="{Binding TeacherStatusTitle}" />
                         <Label
-                            LineBreakMode="TailTruncation"
-                            MaxLines="2"
-                            Style="{StaticResource SectionTitle}"
                             Text="{Binding TeacherLocationText}" />
                         <Label
-                            LineBreakMode="TailTruncation"
-                            MaxLines="2"
+                            Style="{StaticResource SecondaryText}"
                             Text="{Binding TeacherSubjectText}" />
+
+                        <VerticalStackLayout
+                            IsVisible="{Binding SelectedTeacherProfile.HasDisciplines}"
+                            Spacing="6">
+                            <BoxView
+                                HeightRequest="1"
+                                Color="{AppThemeBinding Light={StaticResource OutlineLight}, Dark={StaticResource OutlineDark}}" />
+                            <Label Style="{StaticResource SectionTitle}" Text="Преподаваемые дисциплины" />
+                            <Label LineBreakMode="WordWrap" Text="{Binding SelectedTeacherProfile.DisciplinesText}" />
+                        </VerticalStackLayout>
+
+                        <VerticalStackLayout
+                            IsVisible="{Binding SelectedTeacherProfile.HasSpecialties}"
+                            Spacing="6">
+                            <BoxView
+                                HeightRequest="1"
+                                Color="{AppThemeBinding Light={StaticResource OutlineLight}, Dark={StaticResource OutlineDark}}" />
+                            <Label Style="{StaticResource SectionTitle}" Text="Специальности" />
+                            <Label LineBreakMode="WordWrap" Text="{Binding SelectedTeacherProfile.SpecialtiesText}" />
+                        </VerticalStackLayout>
+
+                        <Label
+                            IsVisible="{Binding SelectedTeacherProfile.HasNoAcademicDetails}"
+                            Style="{StaticResource SecondaryText}"
+                            Text="Дополнительные сведения отсутствуют в справочнике." />
                     </VerticalStackLayout>
                 </Border>
             </VerticalStackLayout>

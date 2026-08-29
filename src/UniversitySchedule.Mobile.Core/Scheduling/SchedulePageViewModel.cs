@@ -52,6 +52,7 @@ public sealed class SchedulePageViewModel : ObservableObject
     private string _teacherDetailLabel = "Текущая аудитория";
     private string _teacherSubjectText = string.Empty;
     private string _teacherLocationText = "Расписание появится после синхронизации.";
+    private TeacherProfileCard? _selectedTeacherProfile;
     private string _syncStatusText = "Расписание ещё не загружено.";
     private bool _isLoading;
 
@@ -196,6 +197,11 @@ public sealed class SchedulePageViewModel : ObservableObject
             }
 
             OnPropertyChanged(nameof(HasSelectedTeacher));
+            SelectedTeacherProfile = value is null
+                ? null
+                : _teacherReferences.TryGetValue(value.Id, out TeacherReference? reference)
+                    ? TeacherProfileCard.FromReference(reference)
+                    : TeacherProfileCard.FromSummary(value);
             RefreshTeacherLocation();
             RefreshVisibleLessons();
             if (value is not null && _scheduleRepository is not null)
@@ -232,6 +238,12 @@ public sealed class SchedulePageViewModel : ObservableObject
     public bool HasNoTeacherOptions => !HasTeacherOptions;
 
     public bool HasSelectedTeacher => SelectedTeacher is not null;
+
+    public TeacherProfileCard? SelectedTeacherProfile
+    {
+        get => _selectedTeacherProfile;
+        private set => SetProperty(ref _selectedTeacherProfile, value);
+    }
 
     public bool HasLessons => Lessons.Count > 0;
 
@@ -396,14 +408,11 @@ public sealed class SchedulePageViewModel : ObservableObject
         if (_teacherReferences.TryGetValue(SelectedTeacher.Id, out TeacherReference? reference) &&
             reference.Schedule.Count == 0)
         {
-            string disciplines = reference.Disciplines.Count == 0
-                ? "Дисциплины не указаны в источнике."
-                : string.Join(", ", reference.Disciplines.Take(5));
             SetTeacherStatus(
                 "Расписание не опубликовано",
-                reference.Position ?? string.Empty,
-                disciplines,
-                "Преподаваемые дисциплины");
+                "На сайте КФУ нет занятий этого преподавателя.",
+                "Доступные сведения приведены в карточке ниже.",
+                "Статус расписания");
             return;
         }
 
@@ -455,14 +464,11 @@ public sealed class SchedulePageViewModel : ObservableObject
             RefreshVisibleLessons();
             if (referenceLessons.Count == 0)
             {
-                string disciplines = reference.Disciplines.Count == 0
-                    ? "Дисциплины не указаны в источнике."
-                    : string.Join(", ", reference.Disciplines.Take(5));
                 SetTeacherStatus(
                     "Расписание не опубликовано",
-                    reference.Position ?? string.Empty,
-                    disciplines,
-                    "Преподаваемые дисциплины");
+                    "На сайте КФУ нет занятий этого преподавателя.",
+                    "Доступные сведения приведены в карточке ниже.",
+                    "Статус расписания");
             }
 
             return;
