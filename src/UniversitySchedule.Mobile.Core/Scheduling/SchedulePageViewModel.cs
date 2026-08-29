@@ -152,9 +152,16 @@ public sealed class SchedulePageViewModel : ObservableObject
             }
 
             OnPropertyChanged(nameof(PeriodText));
+            OnPropertyChanged(nameof(SelectedDateValue));
             RefreshWeekDates();
             RefreshVisibleLessons();
         }
+    }
+
+    public DateTime SelectedDateValue
+    {
+        get => SelectedDate.ToDateTime(TimeOnly.MinValue);
+        set => SelectedDate = DateOnly.FromDateTime(value);
     }
 
     public ScheduleDateItem? SelectedDateItem
@@ -264,6 +271,12 @@ public sealed class SchedulePageViewModel : ObservableObject
     public string TeacherEmptyText => _allTeachers.Count == 0
         ? "Список преподавателей появится после синхронизации расписания."
         : "Преподаватель не найден.";
+
+    public string TeacherCatalogSummaryText => _allTeachers.Count == 0
+        ? "Каталог преподавателей пока пуст."
+        : string.IsNullOrWhiteSpace(TeacherQuery)
+            ? $"{_allTeachers.Count} преподавателей • введите фамилию для поиска"
+            : $"Найдено: {TeacherOptions.Count}";
 
     public string TeacherStatusTitle
     {
@@ -651,6 +664,7 @@ public sealed class SchedulePageViewModel : ObservableObject
         OnPropertyChanged(nameof(HasTeacherOptions));
         OnPropertyChanged(nameof(HasNoTeacherOptions));
         OnPropertyChanged(nameof(TeacherEmptyText));
+        OnPropertyChanged(nameof(TeacherCatalogSummaryText));
     }
 
     private void SetTeacherStatus(

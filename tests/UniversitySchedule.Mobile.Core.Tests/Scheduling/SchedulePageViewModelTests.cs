@@ -48,6 +48,18 @@ public sealed class SchedulePageViewModelTests
     }
 
     [Fact]
+    public void SelectedDateValue_AllowsPickingAnArbitraryCalendarDate()
+    {
+        SchedulePageViewModel viewModel = CreateViewModel();
+
+        viewModel.SelectedDateValue = new DateTime(2026, 10, 14);
+
+        Assert.Equal(new DateOnly(2026, 10, 14), viewModel.SelectedDate);
+        Assert.Contains("14 октября", viewModel.PeriodText);
+        Assert.Single(viewModel.WeekDates, item => item.IsSelected && item.Date == viewModel.SelectedDate);
+    }
+
+    [Fact]
     public void TeacherQuery_FiltersNamesIgnoringCaseWhitespaceAndYo()
     {
         SchedulePageViewModel viewModel = CreateViewModel();
@@ -129,6 +141,23 @@ public sealed class SchedulePageViewModelTests
         Assert.Equal(
             "Список преподавателей появится после синхронизации расписания.",
             viewModel.TeacherEmptyText);
+    }
+
+    [Fact]
+    public void TeacherCatalogSummary_ShowsCatalogAndFilteredResultCounts()
+    {
+        SchedulePageViewModel viewModel = CreateViewModel();
+        viewModel.SetTeachers(
+        [
+            new TeacherSummary(Guid.NewGuid(), "Иванов И.И."),
+            new TeacherSummary(Guid.NewGuid(), "Петров П.П."),
+        ]);
+
+        Assert.Equal("2 преподавателей • введите фамилию для поиска", viewModel.TeacherCatalogSummaryText);
+
+        viewModel.TeacherQuery = "Иванов";
+
+        Assert.Equal("Найдено: 1", viewModel.TeacherCatalogSummaryText);
     }
 
     [Fact]
