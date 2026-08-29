@@ -44,7 +44,15 @@ public partial class AssignmentEditorPage : ContentPage
 
     private async Task LoadAsync()
     {
-        await _scheduleSession.InitializeAsync();
+        try
+        {
+            await _scheduleSession.InitializeAsync();
+        }
+        catch (InvalidOperationException)
+        {
+            // Assignments must remain editable offline even when no schedule was cached yet.
+        }
+
         List<LessonPickerItem> lessons = LessonPickerItem.FromSession(_scheduleSession).ToList();
         PersonalAssignment? assignment = _assignmentId is Guid id ? await _store.GetAsync(id) : null;
         if (assignment is not null)

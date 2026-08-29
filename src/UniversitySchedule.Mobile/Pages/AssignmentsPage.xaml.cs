@@ -24,18 +24,17 @@ public partial class AssignmentsPage : ContentPage
 
     private async void OnAddAssignmentClicked(object? sender, EventArgs e) => await OpenEditorAsync();
 
-    private async void OnAssignmentSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (e.CurrentSelection.FirstOrDefault() is AssignmentListItem assignment)
-        {
-            AssignmentsCollection.SelectedItem = null;
-            await OpenEditorAsync(assignment.Id);
-        }
-    }
-
     private async void OnEditAssignmentInvoked(object? sender, EventArgs e)
     {
         if (sender is SwipeItem { CommandParameter: Guid id })
+        {
+            await OpenEditorAsync(id);
+        }
+    }
+
+    private async void OnEditAssignmentClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { CommandParameter: Guid id })
         {
             await OpenEditorAsync(id);
         }

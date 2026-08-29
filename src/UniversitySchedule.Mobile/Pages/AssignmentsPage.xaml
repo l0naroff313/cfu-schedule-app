@@ -66,11 +66,9 @@
 
         <Grid Grid.Row="3">
             <CollectionView
-                x:Name="AssignmentsCollection"
                 IsVisible="{Binding HasAssignments}"
                 ItemsSource="{Binding Assignments}"
-                SelectionChanged="OnAssignmentSelectionChanged"
-                SelectionMode="Single">
+                SelectionMode="None">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="assignments:AssignmentListItem">
                         <SwipeView>
@@ -117,6 +115,15 @@
                                             </Label.Triggers>
                                         </Label>
                                         <Label HorizontalTextAlignment="End" Style="{StaticResource SecondaryText}" Text="{Binding StatusText}" />
+                                        <Button
+                                            CommandParameter="{Binding Id}"
+                                            Clicked="OnEditAssignmentClicked"
+                                            HeightRequest="36"
+                                            HorizontalOptions="End"
+                                            SemanticProperties.Description="Редактировать задание"
+                                            Style="{StaticResource IconButton}"
+                                            Text="⋯"
+                                            WidthRequest="36" />
                                     </VerticalStackLayout>
                                 </Grid>
                             </Border>
