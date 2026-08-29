@@ -18,6 +18,18 @@
 | --- | --- |
 | ![Тёмная тема](design-references/campus-pulse-five-tabs-dark.png) | ![Светлая тема](design-references/campus-pulse-five-tabs-light.png) |
 
+## Скриншоты MVP
+
+Скриншоты сняты на Android 16 после первого запуска для группы ПИ-б-о-252, 1 подгруппы.
+
+| Первый запуск | Сегодня | Расписание |
+| --- | --- | --- |
+| <img src="docs/screenshots/mvp-first-run/01-first-launch.png" alt="Первый запуск" width="260"> | <img src="docs/screenshots/mvp-first-run/02-today.png" alt="Сегодня" width="260"> | <img src="docs/screenshots/mvp-first-run/03-schedule.png" alt="Расписание" width="260"> |
+
+| Задания | Заметки | Профиль |
+| --- | --- | --- |
+| <img src="docs/screenshots/mvp-first-run/04-assignments.png" alt="Задания" width="260"> | <img src="docs/screenshots/mvp-first-run/05-notes.png" alt="Заметки" width="260"> | <img src="docs/screenshots/mvp-first-run/06-profile.png" alt="Профиль" width="260"> |
+
 ## Структура решения
 
 ```text
