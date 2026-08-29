@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using UniversitySchedule.Contracts.Catalog;
 using UniversitySchedule.Mobile.Core.Scheduling;
 
 namespace UniversitySchedule.Mobile.Pages;
@@ -69,6 +70,15 @@ public partial class SchedulePage : ContentPage
         }
         catch (OperationCanceledException)
         {
+        }
+    }
+
+    private void OnTeacherResultClicked(object? sender, EventArgs e)
+    {
+        if (sender is Button { CommandParameter: TeacherSummary teacher })
+        {
+            _viewModel.ChooseTeacher(teacher);
+            TeacherSearchBar.Unfocus();
         }
     }
 

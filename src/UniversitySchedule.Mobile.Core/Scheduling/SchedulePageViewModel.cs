@@ -48,11 +48,12 @@ public sealed class SchedulePageViewModel : ObservableObject
     private ScheduleDateItem? _selectedDateItem;
     private string _teacherQuery = string.Empty;
     private TeacherSummary? _selectedTeacher;
-    private string _teacherStatusTitle = "Выберите преподавателя";
+    private string _teacherStatusTitle = "Найдите преподавателя";
     private string _teacherDetailLabel = "Текущая аудитория";
     private string _teacherSubjectText = string.Empty;
     private string _teacherLocationText = "Расписание появится после синхронизации.";
     private TeacherProfileCard? _selectedTeacherProfile;
+    private int _teacherMatchCount;
     private string _syncStatusText = "Расписание ещё не загружено.";
     private bool _isLoading;
 
@@ -188,6 +189,15 @@ public sealed class SchedulePageViewModel : ObservableObject
         {
             if (SetProperty(ref _teacherQuery, value ?? string.Empty))
             {
+                if (SelectedTeacher is not null &&
+                    !string.Equals(
+                        NormalizeForSearch(SelectedTeacher.DisplayName),
+                        NormalizeForSearch(_teacherQuery),
+                        StringComparison.Ordinal))
+                {
+                    SelectedTeacher = null;
+                }
+
                 ApplyTeacherFilter();
             }
         }
@@ -204,6 +214,8 @@ public sealed class SchedulePageViewModel : ObservableObject
             }
 
             OnPropertyChanged(nameof(HasSelectedTeacher));
+            OnPropertyChanged(nameof(HasTeacherOptions));
+            OnPropertyChanged(nameof(HasNoTeacherOptions));
             SelectedTeacherProfile = value is null
                 ? null
                 : _teacherReferences.TryGetValue(value.Id, out TeacherReference? reference)
@@ -240,9 +252,16 @@ public sealed class SchedulePageViewModel : ObservableObject
         }
     }
 
-    public bool HasTeacherOptions => TeacherOptions.Count > 0;
+    public bool HasTeacherOptions =>
+        SelectedTeacher is null &&
+        !string.IsNullOrWhiteSpace(TeacherQuery) &&
+        TeacherOptions.Count > 0;
 
-    public bool HasNoTeacherOptions => !HasTeacherOptions;
+    public bool HasNoTeacherOptions =>
+        _allTeachers.Count == 0 ||
+        (SelectedTeacher is null &&
+         !string.IsNullOrWhiteSpace(TeacherQuery) &&
+         TeacherOptions.Count == 0);
 
     public bool HasSelectedTeacher => SelectedTeacher is not null;
 
@@ -276,7 +295,7 @@ public sealed class SchedulePageViewModel : ObservableObject
         ? "Каталог преподавателей пока пуст."
         : string.IsNullOrWhiteSpace(TeacherQuery)
             ? $"{_allTeachers.Count} преподавателей • введите фамилию для поиска"
-            : $"Найдено: {TeacherOptions.Count}";
+            : $"Найдено: {_teacherMatchCount}";
 
     public string TeacherStatusTitle
     {
@@ -313,7 +332,7 @@ public sealed class SchedulePageViewModel : ObservableObject
 
             if (IsTeacherMode && SelectedTeacher is null)
             {
-                return "Выберите преподавателя, чтобы открыть его расписание.";
+                return "Найдите преподавателя, чтобы открыть его расписание.";
             }
 
             return Range == ScheduleRange.Day
@@ -404,6 +423,14 @@ public sealed class SchedulePageViewModel : ObservableObject
         ApplyTeacherFilter();
     }
 
+    public void ChooseTeacher(TeacherSummary teacher)
+    {
+        ArgumentNullException.ThrowIfNull(teacher);
+
+        TeacherQuery = teacher.DisplayName;
+        SelectedTeacher = teacher;
+    }
+
     public void SetTeacherSchedule(TeacherScheduleCoverage teacherSchedule)
     {
         _teacherSchedule = teacherSchedule ?? throw new ArgumentNullException(nameof(teacherSchedule));
@@ -414,7 +441,7 @@ public sealed class SchedulePageViewModel : ObservableObject
     {
         if (SelectedTeacher is null)
         {
-            SetTeacherStatus("Выберите преподавателя", string.Empty, "Расписание появится после синхронизации.");
+            SetTeacherStatus("Найдите преподавателя", string.Empty, "Расписание появится после синхронизации.");
             return;
         }
 
@@ -647,16 +674,16 @@ public sealed class SchedulePageViewModel : ObservableObject
     private void ApplyTeacherFilter()
     {
         string normalizedQuery = NormalizeForSearch(TeacherQuery);
-        IEnumerable<TeacherSummary> matches = _allTeachers;
-
-        if (normalizedQuery.Length > 0)
-        {
-            matches = matches.Where(teacher =>
-                NormalizeForSearch(teacher.DisplayName).Contains(normalizedQuery, StringComparison.Ordinal));
-        }
+        TeacherSummary[] matches = normalizedQuery.Length == 0
+            ? []
+            : _allTeachers
+                .Where(teacher =>
+                    NormalizeForSearch(teacher.DisplayName).Contains(normalizedQuery, StringComparison.Ordinal))
+                .ToArray();
+        _teacherMatchCount = normalizedQuery.Length == 0 ? _allTeachers.Count : matches.Length;
 
         TeacherOptions.Clear();
-        foreach (TeacherSummary teacher in matches.Take(50))
+        foreach (TeacherSummary teacher in matches.Take(8))
         {
             TeacherOptions.Add(teacher);
         }

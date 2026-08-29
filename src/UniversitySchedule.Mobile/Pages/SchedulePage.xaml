@@ -3,6 +3,7 @@
     x:Class="UniversitySchedule.Mobile.Pages.SchedulePage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:catalog="clr-namespace:UniversitySchedule.Contracts.Catalog;assembly=UniversitySchedule.Contracts"
     xmlns:viewModels="clr-namespace:UniversitySchedule.Mobile.Core.Scheduling;assembly=UniversitySchedule.Mobile.Core"
     x:DataType="viewModels:SchedulePageViewModel"
     BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
@@ -53,20 +54,40 @@
                 <Label Style="{StaticResource SectionTitle}" Text="Выбор преподавателя" />
                 <Border Padding="0" Style="{StaticResource InputBorder}">
                     <SearchBar
+                        x:Name="TeacherSearchBar"
                         Placeholder="Найти преподавателя"
                         SearchButtonPressed="OnTeacherSearchButtonPressed"
                         SemanticProperties.Description="Поиск преподавателя"
                         Text="{Binding TeacherQuery}" />
                 </Border>
                 <Label Style="{StaticResource SecondaryText}" Text="{Binding TeacherCatalogSummaryText}" />
-                <Border
+                <VerticalStackLayout
+                    BindableLayout.ItemsSource="{Binding TeacherOptions}"
                     IsVisible="{Binding HasTeacherOptions}"
-                    Style="{StaticResource Card}">
-                    <Picker
-                        ItemsSource="{Binding TeacherOptions}"
-                        SelectedItem="{Binding SelectedTeacher}"
-                        Title="Выберите преподавателя" />
-                </Border>
+                    Spacing="6">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="catalog:TeacherSummary">
+                            <Border Padding="14,10" Style="{StaticResource Card}">
+                                <Grid>
+                                    <Grid RowDefinitions="Auto,Auto" RowSpacing="2">
+                                        <Label Style="{StaticResource SectionTitle}" Text="{Binding DisplayName}" />
+                                        <Label
+                                            Grid.Row="1"
+                                            Style="{StaticResource SecondaryText}"
+                                            Text="{Binding SecondaryText}" />
+                                    </Grid>
+                                    <Button
+                                        CommandParameter="{Binding .}"
+                                        Clicked="OnTeacherResultClicked"
+                                        HorizontalOptions="Fill"
+                                        Opacity="0.01"
+                                        SemanticProperties.Description="{Binding DisplayName, StringFormat='Открыть преподавателя {0}'}"
+                                        VerticalOptions="Fill" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
                 <Label
                     IsVisible="{Binding HasNoTeacherOptions}"
                     Style="{StaticResource SecondaryText}"

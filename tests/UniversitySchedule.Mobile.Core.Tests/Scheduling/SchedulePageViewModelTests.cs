@@ -74,6 +74,31 @@ public sealed class SchedulePageViewModelTests
     }
 
     [Fact]
+    public void TeacherSearch_SelectsResultWithoutASeparatePicker()
+    {
+        SchedulePageViewModel viewModel = CreateViewModel();
+        var teacher = new TeacherSummary(Guid.NewGuid(), "Иванова Елена Сергеевна", "доцент");
+        viewModel.SetTeachers(
+        [
+            teacher,
+            new TeacherSummary(Guid.NewGuid(), "Петров Пётр Петрович"),
+        ]);
+
+        Assert.Empty(viewModel.TeacherOptions);
+        Assert.False(viewModel.HasTeacherOptions);
+
+        viewModel.TeacherQuery = "Иванова";
+        Assert.True(viewModel.HasTeacherOptions);
+
+        viewModel.ChooseTeacher(Assert.Single(viewModel.TeacherOptions));
+
+        Assert.Equal(teacher.Id, viewModel.SelectedTeacher?.Id);
+        Assert.Equal(teacher.DisplayName, viewModel.TeacherQuery);
+        Assert.False(viewModel.HasTeacherOptions);
+        Assert.True(viewModel.HasSelectedTeacher);
+    }
+
+    [Fact]
     public void CurrentTeacherLesson_ShowsPublishedBuildingAndClassroom()
     {
         SchedulePageViewModel viewModel = CreateViewModel();
