@@ -80,7 +80,7 @@
                                         CommandParameter="{Binding .}"
                                         Clicked="OnTeacherResultClicked"
                                         HorizontalOptions="Fill"
-                                        Opacity="0.01"
+                                        Opacity="0"
                                         SemanticProperties.Description="{Binding DisplayName, StringFormat='Открыть преподавателя {0}'}"
                                         VerticalOptions="Fill" />
                                 </Grid>
@@ -201,7 +201,7 @@
                     <DatePicker
                         Date="{Binding SelectedDateValue, Mode=TwoWay}"
                         HorizontalOptions="Fill"
-                        Opacity="0.01"
+                        Opacity="0"
                         SemanticProperties.Description="Выбрать дату"
                         VerticalOptions="Fill" />
                 </Grid>

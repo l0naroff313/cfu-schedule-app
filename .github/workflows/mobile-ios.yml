@@ -1,0 +1,74 @@
+name: iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - "codex/**"
+    paths:
+      - ".github/workflows/mobile-ios.yml"
+      - "global.json"
+      - "Directory.Build.props"
+      - "src/UniversitySchedule.Contracts/**"
+      - "src/UniversitySchedule.Domain/**"
+      - "src/UniversitySchedule.Mobile.Core/**"
+      - "src/UniversitySchedule.Mobile/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/mobile-ios.yml"
+      - "global.json"
+      - "Directory.Build.props"
+      - "src/UniversitySchedule.Contracts/**"
+      - "src/UniversitySchedule.Domain/**"
+      - "src/UniversitySchedule.Mobile.Core/**"
+      - "src/UniversitySchedule.Mobile/**"
+
+permissions:
+  contents: read
+
+jobs:
+  simulator-build:
+    name: iPhone Simulator Release
+    runs-on: macos-26
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Select Xcode 26.5
+        run: sudo xcode-select --switch /Applications/Xcode_26.5.app/Contents/Developer
+
+      - name: Install the .NET MAUI workload
+        run: dotnet workload install maui --skip-manifest-update
+
+      - name: Restore iOS dependencies
+        run: >-
+          dotnet restore
+          src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj
+          -p:RuntimeIdentifier=iossimulator-arm64
+
+      - name: Build the iPhone Simulator app
+        run: >-
+          dotnet build
+          src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj
+          --configuration Release
+          --framework net10.0-ios
+          --no-restore
+          -p:RuntimeIdentifier=iossimulator-arm64
+          -warnaserror
+
+      - name: Upload the simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: CFU-ElJournal-iOS-Simulator
+          path: src/UniversitySchedule.Mobile/bin/Release/net10.0-ios/iossimulator-arm64/UniversitySchedule.Mobile.app
+          if-no-files-found: error
+          retention-days: 14

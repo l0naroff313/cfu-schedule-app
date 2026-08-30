@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using UniversitySchedule.Mobile.Controls;
 using UniversitySchedule.Mobile.Core.Assignments;
 using UniversitySchedule.Mobile.Core.Profiles;
 using UniversitySchedule.Mobile.Core.Scheduling;
@@ -29,10 +30,13 @@ public partial class ProfilePage : ContentPage
         ShowProfile(_scheduleSession.Profile);
         PersonalAssignment[] assignments = (await _assignmentStore.GetAllAsync()).ToArray();
         int completed = assignments.Count(item => item.Status == PersonalAssignmentStatus.Completed);
+        double completion = assignments.Length == 0
+            ? 0d
+            : (double)completed / assignments.Length;
         AssignmentCountLabel.Text = assignments.Length.ToString();
-        CompletionLabel.Text = assignments.Length == 0
-            ? "0%"
-            : $"{Math.Round((double)completed / assignments.Length * 100):0}%";
+        CompletionLabel.Text = $"{Math.Round(completion * 100):0}%";
+        CompletionRing.Drawable = CreateCompletionRing(completion);
+        CompletionRing.Invalidate();
     }
 
     private async void OnChangeProfileClicked(object? sender, EventArgs e)
@@ -80,5 +84,12 @@ public partial class ProfilePage : ContentPage
         SyncLabel.Text = _scheduleSession.UpdatedAtUtc is DateTimeOffset updatedAt
             ? $"Последнее обновление: {updatedAt.ToLocalTime():dd.MM.yyyy HH:mm}"
             : "Расписание ещё не синхронизировано.";
+    }
+
+    private static CompletionRingDrawable CreateCompletionRing(double completion)
+    {
+        bool isDark = Application.Current?.RequestedTheme == AppTheme.Dark;
+        Color trackColor = Color.FromArgb(isDark ? "#1A3855" : "#E8EDF4");
+        return new CompletionRingDrawable(completion, trackColor, Color.FromArgb("#82D21E"));
     }
 }
