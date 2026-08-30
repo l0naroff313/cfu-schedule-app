@@ -31,6 +31,14 @@ public sealed class SchedulePageViewModel : ObservableObject
 {
     private static readonly TimeSpan UniversityUtcOffset = TimeSpan.FromHours(3);
     private static readonly CultureInfo RussianCulture = CultureInfo.GetCultureInfo("ru-RU");
+    private static readonly TeacherProfileCard EmptyTeacherProfile = new(
+        string.Empty,
+        string.Empty,
+        string.Empty,
+        string.Empty,
+        false,
+        false,
+        true);
 
     private readonly TimeProvider _timeProvider;
     private readonly ScheduleSession? _scheduleSession;
@@ -52,7 +60,7 @@ public sealed class SchedulePageViewModel : ObservableObject
     private string _teacherDetailLabel = "Текущая аудитория";
     private string _teacherSubjectText = string.Empty;
     private string _teacherLocationText = "Расписание появится после синхронизации.";
-    private TeacherProfileCard? _selectedTeacherProfile;
+    private TeacherProfileCard _selectedTeacherProfile = EmptyTeacherProfile;
     private int _teacherMatchCount;
     private string _syncStatusText = "Расписание ещё не загружено.";
     private bool _isLoading;
@@ -217,7 +225,7 @@ public sealed class SchedulePageViewModel : ObservableObject
             OnPropertyChanged(nameof(HasTeacherOptions));
             OnPropertyChanged(nameof(HasNoTeacherOptions));
             SelectedTeacherProfile = value is null
-                ? null
+                ? EmptyTeacherProfile
                 : _teacherReferences.TryGetValue(value.Id, out TeacherReference? reference)
                     ? TeacherProfileCard.FromReference(reference)
                     : TeacherProfileCard.FromSummary(value);
@@ -265,7 +273,7 @@ public sealed class SchedulePageViewModel : ObservableObject
 
     public bool HasSelectedTeacher => SelectedTeacher is not null;
 
-    public TeacherProfileCard? SelectedTeacherProfile
+    public TeacherProfileCard SelectedTeacherProfile
     {
         get => _selectedTeacherProfile;
         private set => SetProperty(ref _selectedTeacherProfile, value);

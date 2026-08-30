@@ -86,6 +86,8 @@ public sealed class SchedulePageViewModelTests
 
         Assert.Empty(viewModel.TeacherOptions);
         Assert.False(viewModel.HasTeacherOptions);
+        Assert.False(viewModel.HasSelectedTeacher);
+        Assert.Empty(viewModel.SelectedTeacherProfile.FullName);
 
         viewModel.TeacherQuery = "Иванова";
         Assert.True(viewModel.HasTeacherOptions);
@@ -96,6 +98,7 @@ public sealed class SchedulePageViewModelTests
         Assert.Equal(teacher.DisplayName, viewModel.TeacherQuery);
         Assert.False(viewModel.HasTeacherOptions);
         Assert.True(viewModel.HasSelectedTeacher);
+        Assert.Equal(teacher.DisplayName, viewModel.SelectedTeacherProfile.FullName);
     }
 
     [Fact]
