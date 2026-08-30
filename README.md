@@ -103,7 +103,7 @@ dotnet build src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj -c D
 
 Для запуска iPhone Simulator, создания `.ipa`, подписи и установки на iPhone необходимы Mac с Xcode и учётная запись Apple Developer. На Apple Silicon для симулятора используется `iossimulator-arm64`, для устройства — `ios-arm64`.
 
-Workflow `iOS` дополнительно выполняет Release-сборку с Xcode 26.0 на Apple Silicon runner `macos-26` при изменениях мобильного клиента. Успешный запуск публикует на 14 дней артефакт `CFU-ElJournal-iOS-Simulator`; это приложение только для iPhone Simulator, не устанавливаемый на физический iPhone `.ipa`.
+Workflow `iOS` дополнительно выполняет Release-сборку на Apple Silicon runner `macos-26` с Xcode 26.2 и установленным iOS 26.2 Simulator Runtime. Проверка точного minor-релиза Xcode отключена, поскольку закреплённый .NET iOS workload рекомендует Xcode 26.0, отсутствующий на runner вместе с соответствующим runtime. Успешный запуск публикует на 14 дней артефакт `CFU-ElJournal-iOS-Simulator`; это приложение только для iPhone Simulator, не устанавливаемый на физический iPhone `.ipa`.
 
 API запускается командой:
 
