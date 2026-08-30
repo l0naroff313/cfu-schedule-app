@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.Reflection;
 using UniversitySchedule.Mobile.Core.Assignments;
 using UniversitySchedule.Mobile.Core.Catalog;
 using UniversitySchedule.Mobile.Core.Cfu;
@@ -6,6 +7,7 @@ using UniversitySchedule.Mobile.Core.Identity;
 using UniversitySchedule.Mobile.Core.Notes;
 using UniversitySchedule.Mobile.Core.Profiles;
 using UniversitySchedule.Mobile.Core.Scheduling;
+using UniversitySchedule.Mobile.Core.Sync;
 using UniversitySchedule.Mobile.Pages;
 using UniversitySchedule.Mobile.Services;
 using UniversitySchedule.Mobile.Storage;
@@ -30,6 +32,33 @@ public static class MauiProgram
         builder.Services.AddSingleton<UniversitySchedule.Mobile.Core.Storage.ILocalDataStore, SqliteLocalDataStore>();
         builder.Services.AddSingleton<ISecureValueStore, MauiSecureValueStore>();
         builder.Services.AddSingleton<InstallationIdentityService>();
+        UniversityScheduleApiOptions apiOptions = CreateApiOptions();
+        builder.Services.AddSingleton(apiOptions);
+        builder.Services.AddSingleton(services =>
+        {
+            var client = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(15),
+            };
+            if (apiOptions.BaseAddress is not null)
+            {
+                client.BaseAddress = apiOptions.BaseAddress;
+            }
+
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("CFU-ElJournal/1.0");
+            return new UniversityScheduleApiClient(
+                client,
+                apiOptions,
+                services.GetRequiredService<InstallationIdentityService>(),
+                services.GetRequiredService<ISecureValueStore>(),
+                services.GetRequiredService<TimeProvider>());
+        });
+        builder.Services.AddSingleton<PersonalDataSyncQueue>();
+        builder.Services.AddSingleton<PersonalDataSynchronizer>();
+        builder.Services.AddSingleton<PersonalDataSyncCoordinator>();
+        builder.Services.AddSingleton<IPersonalDataChangeSink>(services =>
+            services.GetRequiredService<PersonalDataSyncCoordinator>());
+        builder.Services.AddSingleton<ConnectivitySyncService>();
         builder.Services.AddSingleton<IReferenceCatalogProvider, EmbeddedReferenceCatalogProvider>();
         builder.Services.AddSingleton<PersonalNoteStore>();
         builder.Services.AddSingleton<PersonalAssignmentStore>();
@@ -67,5 +96,29 @@ public static class MauiProgram
 #endif
 
         return builder.Build();
+    }
+
+    private static UniversityScheduleApiOptions CreateApiOptions()
+    {
+        string? configuredAddress = typeof(MauiProgram).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(attribute => attribute.Key == "UniversityScheduleApiBaseUrl")
+            ?.Value;
+        Uri? baseAddress = null;
+        if (!string.IsNullOrWhiteSpace(configuredAddress))
+        {
+            string normalizedAddress = configuredAddress.EndsWith("/", StringComparison.Ordinal)
+                ? configuredAddress
+                : $"{configuredAddress}/";
+            Uri.TryCreate(normalizedAddress, UriKind.Absolute, out baseAddress);
+        }
+
+        string platform = DeviceInfo.Current.Platform == DevicePlatform.Android
+            ? "android"
+            : "ios";
+        return new UniversityScheduleApiOptions(
+            baseAddress,
+            platform,
+            AppInfo.Current.VersionString);
     }
 }

@@ -2,7 +2,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using UniversitySchedule.Mobile.Core.Identity;
 using UniversitySchedule.Mobile.Core.Scheduling;
+using UniversitySchedule.Mobile.Core.Sync;
 using UniversitySchedule.Mobile.Pages;
+using UniversitySchedule.Mobile.Services;
 
 namespace UniversitySchedule.Mobile;
 
@@ -11,6 +13,8 @@ public partial class AppShell : Shell
     private readonly IServiceProvider _services;
     private readonly ScheduleSession _scheduleSession;
     private readonly InstallationIdentityService _installationIdentity;
+    private readonly PersonalDataSyncCoordinator _syncCoordinator;
+    private readonly ConnectivitySyncService _connectivitySync;
     private readonly ILogger<AppShell> _logger;
     private bool _startupChecked;
 
@@ -18,11 +22,15 @@ public partial class AppShell : Shell
         IServiceProvider services,
         ScheduleSession scheduleSession,
         InstallationIdentityService installationIdentity,
+        PersonalDataSyncCoordinator syncCoordinator,
+        ConnectivitySyncService connectivitySync,
         ILogger<AppShell> logger)
     {
         _services = services;
         _scheduleSession = scheduleSession;
         _installationIdentity = installationIdentity;
+        _syncCoordinator = syncCoordinator;
+        _connectivitySync = connectivitySync;
         _logger = logger;
         InitializeComponent();
 
@@ -45,6 +53,8 @@ public partial class AppShell : Shell
         try
         {
             await _installationIdentity.GetOrCreateAsync();
+            _syncCoordinator.StartBackgroundSynchronization();
+            _connectivitySync.Start();
         }
         catch (Exception exception)
         {

@@ -1,14 +1,31 @@
 using System.Text.Json;
 using UniversitySchedule.Mobile.Core.Storage;
+using UniversitySchedule.Mobile.Core.Sync;
 
 namespace UniversitySchedule.Mobile.Core.Notes;
 
-public sealed class PersonalNoteStore(ILocalDataStore localDataStore, TimeProvider timeProvider)
+public sealed class PersonalNoteStore
 {
     private const string StorageKey = "personal-notes:v1";
-    private readonly ILocalDataStore _localDataStore = localDataStore;
-    private readonly TimeProvider _timeProvider = timeProvider;
+    private readonly ILocalDataStore _localDataStore;
+    private readonly TimeProvider _timeProvider;
+    private readonly IPersonalDataChangeSink _changeSink;
     private readonly SemaphoreSlim _lock = new(1, 1);
+
+    public PersonalNoteStore(ILocalDataStore localDataStore, TimeProvider timeProvider)
+        : this(localDataStore, timeProvider, NullPersonalDataChangeSink.Instance)
+    {
+    }
+
+    public PersonalNoteStore(
+        ILocalDataStore localDataStore,
+        TimeProvider timeProvider,
+        IPersonalDataChangeSink changeSink)
+    {
+        _localDataStore = localDataStore;
+        _timeProvider = timeProvider;
+        _changeSink = changeSink;
+    }
 
     public async Task<IReadOnlyList<PersonalNote>> GetAllAsync(CancellationToken cancellationToken = default)
     {
@@ -43,6 +60,7 @@ public sealed class PersonalNoteStore(ILocalDataStore localDataStore, TimeProvid
                 isPinned);
             notes.Add(note);
             await SaveAllAsync(notes, now, cancellationToken);
+            await _changeSink.NoteUpsertedAsync(note, cancellationToken);
             return note;
         }
         finally
@@ -90,6 +108,7 @@ public sealed class PersonalNoteStore(ILocalDataStore localDataStore, TimeProvid
             };
             notes[index] = updated;
             await SaveAllAsync(notes, now, cancellationToken);
+            await _changeSink.NoteUpsertedAsync(updated, cancellationToken);
             return updated;
         }
         finally
@@ -114,6 +133,7 @@ public sealed class PersonalNoteStore(ILocalDataStore localDataStore, TimeProvid
 
             DateTimeOffset now = _timeProvider.GetUtcNow();
             await SaveAllAsync(notes, now, cancellationToken);
+            await _changeSink.NoteDeletedAsync(id, now, cancellationToken);
             return true;
         }
         finally

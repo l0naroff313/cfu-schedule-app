@@ -64,6 +64,8 @@ UniversitySchedule.sln
 - пять вкладок, выровненные с финальными светлой и тёмной дизайн-досками, включая карточки, фильтры, пустые состояния и профильную статистику;
 - экран настроек с явными кнопками выхода, системной/светлой/тёмной темами и корректным оформлением системных панелей Android;
 - анонимный установочный UUID и 256-битный секрет в Android Keystore/iOS Keychain без аппаратных или персональных идентификаторов;
+- серверная регистрация установки: HMAC-хеш секрета в PostgreSQL, короткоживущий JWT и изоляция данных по проверенному `installation_id`;
+- офлайн-очередь синхронизации создания, редактирования и удаления заметок/заданий с идемпотентными мутациями и tombstones;
 - версионированные API-контракты и health endpoint;
 - unit-тесты доменной, прикладной и мобильной логики.
 
@@ -83,8 +85,23 @@ dotnet test UniversitySchedule.sln --no-build --no-restore
 API запускается командой:
 
 ```powershell
+dotnet user-secrets --project src/UniversitySchedule.Api set "ConnectionStrings:PostgreSql" "Host=localhost;Port=5432;Database=cfu_schedule;Username=cfu_schedule;Password=YOUR_PASSWORD"
+dotnet user-secrets --project src/UniversitySchedule.Api set "InstallationAuthentication:SecretPepper" "YOUR_RANDOM_SECRET_OF_AT_LEAST_32_BYTES"
+dotnet user-secrets --project src/UniversitySchedule.Api set "InstallationAuthentication:JwtSigningKey" "ANOTHER_RANDOM_SECRET_OF_AT_LEAST_32_BYTES"
+dotnet tool restore
+dotnet ef database update --project src/UniversitySchedule.Infrastructure
 dotnet run --project src/UniversitySchedule.Api
 ```
+
+На Ubuntu те же значения задаются переменными окружения `ConnectionStrings__PostgreSql`, `InstallationAuthentication__SecretPepper` и `InstallationAuthentication__JwtSigningKey`. Секреты не входят в репозиторий.
+
+Чтобы мобильная сборка отправляла очередь на сервер, укажите доступный с телефона или эмулятора HTTPS-адрес в локальном `Directory.Build.local.props`:
+
+```xml
+<UniversityScheduleApiBaseUrl>https://your-api.example/</UniversityScheduleApiBaseUrl>
+```
+
+Адрес без HTTPS намеренно отключает синхронизацию: установочный секрет никогда не отправляется по открытому HTTP. Локальная Ubuntu VM подходит для разработки, если устройство видит её в сети и доверяет TLS-сертификату. Без запущенного сервера приложение продолжает полноценно хранить изменения в SQLite и отправит их позже.
 
 Справочник направлений и преподавателей обновляется командой:
 
@@ -92,10 +109,10 @@ dotnet run --project src/UniversitySchedule.Api
 dotnet run --project src/UniversitySchedule.ScheduleImporter
 ```
 
-Отдельный PostgreSQL или Ubuntu-сервер для текущего этапа не требуется: мобильный клиент читает официальный HTTPS API напрямую и работает с локальным SQLite-кэшем. Сервер понадобится на следующих этапах для синхронизации личных заметок между устройствами и резервного импорта.
+Для просмотра расписания сервер по-прежнему не требуется: мобильный клиент читает официальный HTTPS API КФУ и использует SQLite-кэш. ASP.NET Core API и PostgreSQL нужны только для серверной копии и синхронизации личных заметок и заданий.
 
 ## Дальнейший план
 
-1. Автоматизировать регулярное обновление справочника и отчёта покрытия расписания.
-2. Зарегистрировать установочную идентичность в серверном API и добавить PostgreSQL и локальную очередь синхронизации.
+1. Добавить загрузку серверного snapshot в локальную SQLite-базу для восстановления данных после переустановки на той же идентичности.
+2. Автоматизировать регулярное обновление справочника и отчёта покрытия расписания.
 3. Реализовать уведомления, провести расширенные accessibility/UI-тесты на Android и iOS и подготовить release-сборки.

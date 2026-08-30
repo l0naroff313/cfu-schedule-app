@@ -2,5 +2,7 @@
   <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
     <AndroidSdkDirectory>C:\path\to\Android\Sdk</AndroidSdkDirectory>
     <JavaSdkDirectory>C:\path\to\Microsoft\jdk-21</JavaSdkDirectory>
+    <!-- HTTPS address reachable from the emulator/device, including the trailing slash. -->
+    <UniversityScheduleApiBaseUrl>https://your-api.example/</UniversityScheduleApiBaseUrl>
   </PropertyGroup>
 </Project>

@@ -28,6 +28,9 @@
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
+		<!-- Set this in Directory.Build.local.props to enable HTTPS sync with the ASP.NET Core API. -->
+		<UniversityScheduleApiBaseUrl Condition="'$(UniversityScheduleApiBaseUrl)' == ''"></UniversityScheduleApiBaseUrl>
+
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
 	</PropertyGroup>
@@ -57,6 +60,13 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\UniversitySchedule.Mobile.Core\UniversitySchedule.Mobile.Core.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+			<_Parameter1>UniversityScheduleApiBaseUrl</_Parameter1>
+			<_Parameter2>$(UniversityScheduleApiBaseUrl)</_Parameter2>
+		</AssemblyAttribute>
 	</ItemGroup>
 
 </Project>

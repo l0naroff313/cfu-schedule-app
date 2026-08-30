@@ -1,14 +1,13 @@
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
 using UniversitySchedule.Contracts.System;
 
 namespace UniversitySchedule.Api.IntegrationTests;
 
-public sealed class SystemEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class SystemEndpointsTests : IClassFixture<ApiFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly ApiFactory _factory;
 
-    public SystemEndpointsTests(WebApplicationFactory<Program> factory)
+    public SystemEndpointsTests(ApiFactory factory)
     {
         _factory = factory;
     }

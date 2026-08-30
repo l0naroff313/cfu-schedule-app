@@ -1,17 +1,36 @@
 using System.Text.Json;
 using UniversitySchedule.Mobile.Core.Storage;
+using UniversitySchedule.Mobile.Core.Sync;
 
 namespace UniversitySchedule.Mobile.Core.Assignments;
 
-public sealed class PersonalAssignmentStore(ILocalDataStore localDataStore, TimeProvider timeProvider)
+public sealed class PersonalAssignmentStore
 {
     private const string StorageKey = "personal-assignments:v1";
+    private readonly ILocalDataStore _localDataStore;
+    private readonly TimeProvider _timeProvider;
+    private readonly IPersonalDataChangeSink _changeSink;
     private readonly SemaphoreSlim _lock = new(1, 1);
+
+    public PersonalAssignmentStore(ILocalDataStore localDataStore, TimeProvider timeProvider)
+        : this(localDataStore, timeProvider, NullPersonalDataChangeSink.Instance)
+    {
+    }
+
+    public PersonalAssignmentStore(
+        ILocalDataStore localDataStore,
+        TimeProvider timeProvider,
+        IPersonalDataChangeSink changeSink)
+    {
+        _localDataStore = localDataStore;
+        _timeProvider = timeProvider;
+        _changeSink = changeSink;
+    }
 
     public async Task<IReadOnlyList<PersonalAssignment>> GetAllAsync(
         CancellationToken cancellationToken = default)
     {
-        LocalDocument? document = await localDataStore.GetAsync(StorageKey, cancellationToken);
+        LocalDocument? document = await _localDataStore.GetAsync(StorageKey, cancellationToken);
         return document is null
             ? []
             : JsonSerializer.Deserialize<IReadOnlyList<PersonalAssignment>>(document.Content) ?? [];
@@ -35,7 +54,7 @@ public sealed class PersonalAssignmentStore(ILocalDataStore localDataStore, Time
         try
         {
             List<PersonalAssignment> assignments = (await GetAllAsync(cancellationToken)).ToList();
-            DateTimeOffset now = timeProvider.GetUtcNow();
+            DateTimeOffset now = _timeProvider.GetUtcNow();
             var assignment = new PersonalAssignment(
                 Guid.NewGuid(),
                 lessonId,
@@ -47,6 +66,7 @@ public sealed class PersonalAssignmentStore(ILocalDataStore localDataStore, Time
                 now);
             assignments.Add(assignment);
             await SaveAllAsync(assignments, now, cancellationToken);
+            await _changeSink.AssignmentUpsertedAsync(assignment, cancellationToken);
             return assignment;
         }
         finally
@@ -75,7 +95,7 @@ public sealed class PersonalAssignmentStore(ILocalDataStore localDataStore, Time
                 throw new KeyNotFoundException($"Assignment '{id}' was not found.");
             }
 
-            DateTimeOffset now = timeProvider.GetUtcNow();
+            DateTimeOffset now = _timeProvider.GetUtcNow();
             PersonalAssignment updated = assignments[index] with
             {
                 LessonId = lessonId,
@@ -87,6 +107,7 @@ public sealed class PersonalAssignmentStore(ILocalDataStore localDataStore, Time
             };
             assignments[index] = updated;
             await SaveAllAsync(assignments, now, cancellationToken);
+            await _changeSink.AssignmentUpsertedAsync(updated, cancellationToken);
             return updated;
         }
         finally
@@ -107,8 +128,9 @@ public sealed class PersonalAssignmentStore(ILocalDataStore localDataStore, Time
                 return false;
             }
 
-            DateTimeOffset now = timeProvider.GetUtcNow();
+            DateTimeOffset now = _timeProvider.GetUtcNow();
             await SaveAllAsync(assignments, now, cancellationToken);
+            await _changeSink.AssignmentDeletedAsync(id, now, cancellationToken);
             return true;
         }
         finally
@@ -138,7 +160,7 @@ public sealed class PersonalAssignmentStore(ILocalDataStore localDataStore, Time
         IReadOnlyCollection<PersonalAssignment> assignments,
         DateTimeOffset updatedAtUtc,
         CancellationToken cancellationToken) =>
-        localDataStore.SaveAsync(
+        _localDataStore.SaveAsync(
             new LocalDocument(StorageKey, JsonSerializer.Serialize(assignments), updatedAtUtc),
             cancellationToken);
 
