@@ -1,5 +1,12 @@
 namespace UniversitySchedule.Contracts.PersonalData;
 
+public enum SyncMutationDisposition
+{
+    Applied = 0,
+    AlreadyApplied = 1,
+    Conflict = 2,
+}
+
 public sealed record SyncedNoteResponse(
     Guid Id,
     Guid? LessonId,
@@ -12,7 +19,8 @@ public sealed record SyncedNoteResponse(
     DateTimeOffset ServerUpdatedAtUtc,
     DateTimeOffset? DeletedAtUtc,
     long Revision,
-    bool WasApplied);
+    bool WasApplied,
+    SyncMutationDisposition Disposition);
 
 public sealed record SyncedAssignmentResponse(
     Guid Id,
@@ -26,4 +34,5 @@ public sealed record SyncedAssignmentResponse(
     DateTimeOffset ServerUpdatedAtUtc,
     DateTimeOffset? DeletedAtUtc,
     long Revision,
-    bool WasApplied);
+    bool WasApplied,
+    SyncMutationDisposition Disposition);

@@ -58,6 +58,39 @@ public sealed class PersonalDataSyncQueueTests
         Assert.DoesNotContain(reloaded, operation => operation.MutationId == pending[0].MutationId);
     }
 
+    [Fact]
+    public async Task Queue_PersistsRetryConflictAndLocalResolutionStates()
+    {
+        var dataStore = new InMemoryLocalDataStore();
+        DateTimeOffset now = new(2026, 8, 30, 12, 0, 0, TimeSpan.Zero);
+        var queue = new PersonalDataSyncQueue(dataStore, new FixedTimeProvider(now));
+        Guid noteId = Guid.NewGuid();
+        await queue.EnqueueNoteDeleteAsync(noteId, now);
+        PersonalDataSyncOperation operation = Assert.Single(await queue.GetPendingAsync());
+
+        await queue.RecordRetryAsync(operation.MutationId, "http_503");
+        PersonalDataSyncOperation retried = Assert.Single(await queue.GetPendingAsync());
+        Assert.Equal(PersonalDataSyncOperationState.Pending, retried.State);
+        Assert.Equal(1, retried.AttemptCount);
+        Assert.Equal("http_503", retried.LastErrorCode);
+        Assert.Equal(now, retried.LastAttemptAtUtc);
+
+        await queue.MarkConflictAsync(operation.MutationId, "server_conflict", "{\"revision\":2}");
+        PersonalDataSyncOperation conflict = Assert.Single(await queue.GetPendingAsync());
+        Assert.Equal(PersonalDataSyncOperationState.Conflict, conflict.State);
+        Assert.Equal(2, conflict.AttemptCount);
+        Assert.Equal("{\"revision\":2}", conflict.ConflictServerStateJson);
+
+        await queue.ResolveConflictKeepingLocalAsync(operation.MutationId);
+        PersonalDataSyncOperation manualRetry = Assert.Single(await queue.GetPendingAsync());
+        Assert.Equal(PersonalDataSyncOperationState.Pending, manualRetry.State);
+        Assert.NotEqual(operation.MutationId, manualRetry.MutationId);
+        Assert.True(manualRetry.OccurredAtUtc > operation.OccurredAtUtc);
+        Assert.Equal(0, manualRetry.AttemptCount);
+        Assert.Null(manualRetry.LastErrorCode);
+        Assert.Null(manualRetry.ConflictServerStateJson);
+    }
+
     private sealed class InMemoryLocalDataStore : ILocalDataStore
     {
         private readonly Dictionary<string, LocalDocument> _documents = [];

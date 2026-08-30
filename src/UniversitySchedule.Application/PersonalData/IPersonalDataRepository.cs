@@ -16,5 +16,12 @@ public interface IPersonalDataRepository
 
     void AddAssignment(SyncedAssignment assignment);
 
+    Task<PersonalDataMutationReceipt?> FindMutationReceiptAsync(
+        Guid installationId,
+        Guid mutationId,
+        CancellationToken cancellationToken = default);
+
+    void AddMutationReceipt(PersonalDataMutationReceipt receipt);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

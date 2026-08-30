@@ -10,7 +10,7 @@ namespace UniversitySchedule.Mobile.Core.Tests.Sync;
 public sealed class UniversityScheduleApiClientTests
 {
     [Fact]
-    public async Task TryPushAsync_RegistersOnceAndReusesBearerToken()
+    public async Task PushAsync_RegistersOnceAndReusesBearerToken()
     {
         DateTimeOffset now = new(2026, 8, 30, 12, 0, 0, TimeSpan.Zero);
         var handler = new RecordingHandler(now);
@@ -43,9 +43,11 @@ public sealed class UniversityScheduleApiClientTests
             note.Id,
             now.AddMinutes(1));
 
-        Assert.True(await client.TryPushAsync(upsert));
-        Assert.True(await client.TryPushAsync(delete));
+        PersonalDataPushResult upsertResult = await client.PushAsync(upsert);
+        PersonalDataPushResult deleteResult = await client.PushAsync(delete);
 
+        Assert.Equal(PersonalDataPushOutcome.Succeeded, upsertResult.Outcome);
+        Assert.Equal(PersonalDataPushOutcome.Succeeded, deleteResult.Outcome);
         Assert.Equal(3, handler.Requests.Count);
         Assert.Equal("api/v1/installations/register", handler.Requests[0].Path);
         Assert.Null(handler.Requests[0].Authorization);
@@ -56,7 +58,7 @@ public sealed class UniversityScheduleApiClientTests
     }
 
     [Fact]
-    public async Task TryPushAsync_HttpEndpointIsDisabledBeforeSecretCanBeSent()
+    public async Task PushAsync_HttpEndpointIsDisabledBeforeSecretCanBeSent()
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         var handler = new RecordingHandler(now);
@@ -75,13 +77,98 @@ public sealed class UniversityScheduleApiClientTests
             Guid.NewGuid(),
             now);
 
-        Assert.False(await client.TryPushAsync(operation));
+        PersonalDataPushResult result = await client.PushAsync(operation);
+
+        Assert.Equal(PersonalDataPushOutcome.NotConfigured, result.Outcome);
         Assert.Empty(handler.Requests);
     }
 
-    private sealed class RecordingHandler(DateTimeOffset now) : HttpMessageHandler
+    [Fact]
+    public async Task PushAsync_TransientResponsesRetrySameMutationUntilSuccess()
     {
+        DateTimeOffset now = new(2026, 8, 30, 12, 0, 0, TimeSpan.Zero);
+        var handler = new RecordingHandler(
+            now,
+            HttpStatusCode.ServiceUnavailable,
+            HttpStatusCode.TooManyRequests,
+            HttpStatusCode.OK);
+        UniversityScheduleApiClient client = CreateClient(handler, now);
+        Guid mutationId = Guid.NewGuid();
+        var operation = new PersonalDataSyncOperation(
+            mutationId,
+            PersonalDataSyncEntityKind.Note,
+            PersonalDataSyncMutationKind.Delete,
+            Guid.NewGuid(),
+            now);
+
+        PersonalDataPushResult result = await client.PushAsync(operation);
+
+        Assert.Equal(PersonalDataPushOutcome.Succeeded, result.Outcome);
+        Assert.Equal(3, result.RequestCount);
+        string[] mutationRequests = handler.Requests
+            .Where(request => request.Authorization is not null)
+            .Select(request => request.Path)
+            .ToArray();
+        Assert.Equal(3, mutationRequests.Length);
+        Assert.All(mutationRequests, path => Assert.Contains(mutationId.ToString("D"), path));
+    }
+
+    [Fact]
+    public async Task PushAsync_ConflictIsReturnedWithoutDiscardingDecision()
+    {
+        DateTimeOffset now = new(2026, 8, 30, 12, 0, 0, TimeSpan.Zero);
+        var handler = new RecordingHandler(now, HttpStatusCode.Conflict)
+        {
+            ConflictContent = "{\"revision\":3}",
+        };
+        UniversityScheduleApiClient client = CreateClient(handler, now);
+        var operation = new PersonalDataSyncOperation(
+            Guid.NewGuid(),
+            PersonalDataSyncEntityKind.Assignment,
+            PersonalDataSyncMutationKind.Delete,
+            Guid.NewGuid(),
+            now);
+
+        PersonalDataPushResult result = await client.PushAsync(operation);
+
+        Assert.Equal(PersonalDataPushOutcome.Conflict, result.Outcome);
+        Assert.Equal(1, result.RequestCount);
+        Assert.Equal("server_conflict", result.ErrorCode);
+        Assert.Equal("{\"revision\":3}", result.ServerStateJson);
+    }
+
+    private static UniversityScheduleApiClient CreateClient(
+        RecordingHandler handler,
+        DateTimeOffset now)
+    {
+        var secureStore = new InMemorySecureValueStore();
+        var clock = new FixedTimeProvider(now);
+        var options = new UniversityScheduleApiOptions(
+            new Uri("https://api.example.test/"),
+            "android",
+            "1.0.0");
+        return new UniversityScheduleApiClient(
+            new HttpClient(handler) { BaseAddress = options.BaseAddress },
+            options,
+            new InstallationIdentityService(secureStore, clock),
+            secureStore,
+            clock);
+    }
+
+    private sealed class RecordingHandler : HttpMessageHandler
+    {
+        private readonly DateTimeOffset _now;
+        private readonly Queue<HttpStatusCode> _syncStatuses;
+
+        public RecordingHandler(DateTimeOffset now, params HttpStatusCode[] syncStatuses)
+        {
+            _now = now;
+            _syncStatuses = new Queue<HttpStatusCode>(syncStatuses);
+        }
+
         public List<CapturedRequest> Requests { get; } = [];
+
+        public string? ConflictContent { get; init; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -102,12 +189,26 @@ public sealed class UniversityScheduleApiClientTests
                         registration!.InstallationId,
                         "test-access-token",
                         "Bearer",
-                        now.AddMinutes(15),
+                        _now.AddMinutes(15),
                         true)),
                 };
             }
 
-            return new HttpResponseMessage(HttpStatusCode.OK);
+            HttpStatusCode status = _syncStatuses.TryDequeue(out HttpStatusCode configured)
+                ? configured
+                : HttpStatusCode.OK;
+            var response = new HttpResponseMessage(status);
+            if (status == HttpStatusCode.Conflict && ConflictContent is not null)
+            {
+                response.Content = new StringContent(ConflictContent);
+            }
+
+            if (status == HttpStatusCode.TooManyRequests)
+            {
+                response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.Zero);
+            }
+
+            return response;
         }
     }
 

@@ -3,6 +3,8 @@ namespace UniversitySchedule.Mobile.Core.Sync;
 public sealed record PersonalDataSyncRunResult(
     int SynchronizedCount,
     int PendingCount,
+    int ConflictCount,
+    int FailedCount,
     bool IsConfigured);
 
 public sealed class PersonalDataSynchronizer(
@@ -16,34 +18,88 @@ public sealed class PersonalDataSynchronizer(
     {
         if (!apiClient.IsEnabled)
         {
-            return new PersonalDataSyncRunResult(0, 0, false);
+            IReadOnlyList<PersonalDataSyncOperation> queued = await queue.GetPendingAsync(cancellationToken);
+            return BuildResult(0, queued, false);
         }
 
         await _lock.WaitAsync(cancellationToken);
         try
         {
             int synchronizedCount = 0;
-            while (true)
+            IReadOnlyList<PersonalDataSyncOperation> operations = await queue.GetPendingAsync(cancellationToken);
+            var blockedEntities = new HashSet<(PersonalDataSyncEntityKind Kind, Guid Id)>();
+            foreach (PersonalDataSyncOperation operation in operations)
             {
-                IReadOnlyList<PersonalDataSyncOperation> pending = await queue.GetPendingAsync(cancellationToken);
-                if (pending.Count == 0)
+                var entityKey = (operation.EntityKind, operation.EntityId);
+                if (operation.State is PersonalDataSyncOperationState.Conflict or PersonalDataSyncOperationState.Failed)
                 {
-                    return new PersonalDataSyncRunResult(synchronizedCount, 0, true);
+                    blockedEntities.Add(entityKey);
+                    continue;
                 }
 
-                PersonalDataSyncOperation operation = pending[0];
-                if (!await apiClient.TryPushAsync(operation, cancellationToken))
+                if (blockedEntities.Contains(entityKey))
                 {
-                    return new PersonalDataSyncRunResult(synchronizedCount, pending.Count, true);
+                    continue;
                 }
 
-                await queue.RemoveAsync(operation.MutationId, cancellationToken);
-                synchronizedCount++;
+                PersonalDataPushResult pushResult = await apiClient.PushAsync(operation, cancellationToken);
+                switch (pushResult.Outcome)
+                {
+                    case PersonalDataPushOutcome.Succeeded:
+                        await queue.RemoveAsync(operation.MutationId, cancellationToken);
+                        synchronizedCount++;
+                        break;
+                    case PersonalDataPushOutcome.Conflict:
+                        await queue.MarkConflictAsync(
+                            operation.MutationId,
+                            pushResult.ErrorCode ?? "server_conflict",
+                            pushResult.ServerStateJson,
+                            cancellationToken);
+                        blockedEntities.Add(entityKey);
+                        break;
+                    case PersonalDataPushOutcome.PermanentFailure:
+                        await queue.MarkFailedAsync(
+                            operation.MutationId,
+                            pushResult.ErrorCode ?? "permanent_failure",
+                            cancellationToken);
+                        blockedEntities.Add(entityKey);
+                        break;
+                    case PersonalDataPushOutcome.RetryableFailure:
+                        await queue.RecordRetryAsync(
+                            operation.MutationId,
+                            pushResult.ErrorCode ?? "retryable_failure",
+                            cancellationToken);
+                        return BuildResult(
+                            synchronizedCount,
+                            await queue.GetPendingAsync(cancellationToken),
+                            true);
+                    case PersonalDataPushOutcome.NotConfigured:
+                        return BuildResult(synchronizedCount, operations, false);
+                    default:
+                        throw new InvalidOperationException(
+                            $"Unsupported personal data push outcome: {pushResult.Outcome}.");
+                }
             }
+
+            return BuildResult(
+                synchronizedCount,
+                await queue.GetPendingAsync(cancellationToken),
+                true);
         }
         finally
         {
             _lock.Release();
         }
     }
+
+    private static PersonalDataSyncRunResult BuildResult(
+        int synchronizedCount,
+        IReadOnlyCollection<PersonalDataSyncOperation> operations,
+        bool isConfigured) =>
+        new(
+            synchronizedCount,
+            operations.Count(operation => operation.State == PersonalDataSyncOperationState.Pending),
+            operations.Count(operation => operation.State == PersonalDataSyncOperationState.Conflict),
+            operations.Count(operation => operation.State == PersonalDataSyncOperationState.Failed),
+            isConfigured);
 }

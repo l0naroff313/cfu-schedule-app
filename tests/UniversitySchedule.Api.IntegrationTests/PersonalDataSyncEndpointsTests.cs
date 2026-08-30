@@ -97,19 +97,92 @@ public sealed class PersonalDataSyncEndpointsTests : IClassFixture<ApiFactory>
             newestTime);
         await PutAsync<SyncedNoteResponse>(client, $"/api/v1/sync/notes/{noteId:D}", newest);
 
-        SyncedNoteResponse staleResult = await PutAsync<SyncedNoteResponse>(
-            client,
-            $"/api/v1/sync/notes/{noteId:D}",
+        using JsonContent content = JsonContent.Create(
             newest with
             {
                 MutationId = Guid.NewGuid(),
                 Text = "Устаревшая версия",
                 UpdatedAtUtc = newestTime.AddMinutes(-1),
             });
+        using HttpResponseMessage response = await client.PutAsync(
+            $"/api/v1/sync/notes/{noteId:D}",
+            content);
+        SyncedNoteResponse? staleResult = await response.Content.ReadFromJsonAsync<SyncedNoteResponse>();
 
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.NotNull(staleResult);
+        Assert.Equal(SyncMutationDisposition.Conflict, staleResult.Disposition);
         Assert.False(staleResult.WasApplied);
         Assert.Equal("Новая версия", staleResult.Text);
         Assert.Equal(1, staleResult.Revision);
+    }
+
+    [Fact]
+    public async Task Note_OlderSuccessfulMutationRetry_IsRecognizedAfterNewerMutation()
+    {
+        using HttpClient client = await CreateAuthenticatedClientAsync();
+        Guid noteId = Guid.NewGuid();
+        DateTimeOffset createdAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+        var firstMutation = new SyncNoteRequest(
+            Guid.NewGuid(),
+            null,
+            "Первая версия",
+            null,
+            null,
+            false,
+            createdAt,
+            createdAt);
+        await PutAsync<SyncedNoteResponse>(
+            client,
+            $"/api/v1/sync/notes/{noteId:D}",
+            firstMutation);
+        await PutAsync<SyncedNoteResponse>(
+            client,
+            $"/api/v1/sync/notes/{noteId:D}",
+            firstMutation with
+            {
+                MutationId = Guid.NewGuid(),
+                Text = "Вторая версия",
+                UpdatedAtUtc = createdAt.AddMinutes(1),
+            });
+
+        SyncedNoteResponse repeated = await PutAsync<SyncedNoteResponse>(
+            client,
+            $"/api/v1/sync/notes/{noteId:D}",
+            firstMutation);
+
+        Assert.Equal(SyncMutationDisposition.AlreadyApplied, repeated.Disposition);
+        Assert.False(repeated.WasApplied);
+        Assert.Equal("Вторая версия", repeated.Text);
+        Assert.Equal(2, repeated.Revision);
+    }
+
+    [Fact]
+    public async Task MutationId_ReusedForDifferentEntity_ReturnsConflict()
+    {
+        using HttpClient client = await CreateAuthenticatedClientAsync();
+        Guid mutationId = Guid.NewGuid();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        var request = new SyncNoteRequest(
+            mutationId,
+            null,
+            "Текст",
+            null,
+            null,
+            false,
+            now,
+            now);
+        await PutAsync<SyncedNoteResponse>(
+            client,
+            $"/api/v1/sync/notes/{Guid.NewGuid():D}",
+            request);
+
+        using JsonContent content = JsonContent.Create(request);
+        using HttpResponseMessage response = await client.PutAsync(
+            $"/api/v1/sync/notes/{Guid.NewGuid():D}",
+            content);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
     [Fact]

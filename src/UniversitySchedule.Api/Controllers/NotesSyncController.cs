@@ -26,7 +26,9 @@ public sealed class NotesSyncController(PersonalDataSyncService syncService) : C
             installationId,
             includeDeleted,
             cancellationToken);
-        return Ok(notes.Select(note => ToResponse(note, false)));
+        return Ok(notes.Select(note => ToResponse(
+            note,
+            PersonalDataSyncDisposition.AlreadyApplied)));
     }
 
     [HttpPut("{noteId:guid}")]
@@ -45,20 +47,27 @@ public sealed class NotesSyncController(PersonalDataSyncService syncService) : C
             return BadRequest();
         }
 
-        PersonalDataSyncResult<SyncedNote> result = await syncService.UpsertNoteAsync(
-            new NoteSyncCommand(
-                installationId,
-                noteId,
-                request.MutationId,
-                request.LessonId,
-                request.Text,
-                request.Title,
-                request.Subject,
-                request.IsPinned,
-                request.CreatedAtUtc,
-                request.UpdatedAtUtc),
-            cancellationToken);
-        return Ok(ToResponse(result.Entity, result.WasApplied));
+        try
+        {
+            PersonalDataSyncResult<SyncedNote> result = await syncService.UpsertNoteAsync(
+                new NoteSyncCommand(
+                    installationId,
+                    noteId,
+                    request.MutationId,
+                    request.LessonId,
+                    request.Text,
+                    request.Title,
+                    request.Subject,
+                    request.IsPinned,
+                    request.CreatedAtUtc,
+                    request.UpdatedAtUtc),
+                cancellationToken);
+            return ToMutationResponse(result);
+        }
+        catch (MutationIdReuseException)
+        {
+            return Conflict(CreateMutationReuseProblem());
+        }
     }
 
     [HttpDelete("{noteId:guid}")]
@@ -78,17 +87,43 @@ public sealed class NotesSyncController(PersonalDataSyncService syncService) : C
             return BadRequest();
         }
 
-        PersonalDataSyncResult<SyncedNote> result = await syncService.DeleteNoteAsync(
-            new DeletePersonalDataCommand(
-                installationId,
-                noteId,
-                mutationId,
-                deletedAtUtc),
-            cancellationToken);
-        return Ok(ToResponse(result.Entity, result.WasApplied));
+        try
+        {
+            PersonalDataSyncResult<SyncedNote> result = await syncService.DeleteNoteAsync(
+                new DeletePersonalDataCommand(
+                    installationId,
+                    noteId,
+                    mutationId,
+                    deletedAtUtc),
+                cancellationToken);
+            return ToMutationResponse(result);
+        }
+        catch (MutationIdReuseException)
+        {
+            return Conflict(CreateMutationReuseProblem());
+        }
     }
 
-    private static SyncedNoteResponse ToResponse(SyncedNote note, bool wasApplied) =>
+    private ActionResult<SyncedNoteResponse> ToMutationResponse(
+        PersonalDataSyncResult<SyncedNote> result)
+    {
+        SyncedNoteResponse response = ToResponse(result.Entity, result.Disposition);
+        return result.Disposition == PersonalDataSyncDisposition.Conflict
+            ? Conflict(response)
+            : Ok(response);
+    }
+
+    private static ProblemDetails CreateMutationReuseProblem() =>
+        new()
+        {
+            Status = StatusCodes.Status409Conflict,
+            Title = "Идентификатор изменения уже использован",
+            Detail = "Повторите операцию с новым MutationId.",
+        };
+
+    private static SyncedNoteResponse ToResponse(
+        SyncedNote note,
+        PersonalDataSyncDisposition disposition) =>
         new(
             note.Id,
             note.LessonId,
@@ -101,5 +136,6 @@ public sealed class NotesSyncController(PersonalDataSyncService syncService) : C
             note.ServerUpdatedAtUtc,
             note.DeletedAtUtc,
             note.Revision,
-            wasApplied);
+            disposition == PersonalDataSyncDisposition.Applied,
+            (SyncMutationDisposition)disposition);
 }

@@ -15,6 +15,13 @@ public enum PersonalDataSyncMutationKind
     Delete = 1,
 }
 
+public enum PersonalDataSyncOperationState
+{
+    Pending = 0,
+    Conflict = 1,
+    Failed = 2,
+}
+
 public sealed record PersonalDataSyncOperation(
     Guid MutationId,
     PersonalDataSyncEntityKind EntityKind,
@@ -22,4 +29,9 @@ public sealed record PersonalDataSyncOperation(
     Guid EntityId,
     DateTimeOffset OccurredAtUtc,
     PersonalNote? Note = null,
-    PersonalAssignment? Assignment = null);
+    PersonalAssignment? Assignment = null,
+    PersonalDataSyncOperationState State = PersonalDataSyncOperationState.Pending,
+    int AttemptCount = 0,
+    DateTimeOffset? LastAttemptAtUtc = null,
+    string? LastErrorCode = null,
+    string? ConflictServerStateJson = null);

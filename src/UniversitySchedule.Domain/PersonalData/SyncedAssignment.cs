@@ -122,7 +122,7 @@ public sealed class SyncedAssignment
             deletedAtUtc);
     }
 
-    public bool Apply(
+    public PersonalDataMutationApplyResult Apply(
         Guid mutationId,
         Guid? lessonId,
         string subject,
@@ -135,9 +135,14 @@ public sealed class SyncedAssignment
     {
         Validate(InstallationId, Id, mutationId, text, status);
         DateTimeOffset normalizedClientTime = clientUpdatedAtUtc.ToUniversalTime();
-        if (mutationId == LastMutationId || normalizedClientTime < ClientUpdatedAtUtc)
+        if (mutationId == LastMutationId)
         {
-            return false;
+            return PersonalDataMutationApplyResult.AlreadyApplied;
+        }
+
+        if (normalizedClientTime < ClientUpdatedAtUtc)
+        {
+            return PersonalDataMutationApplyResult.RejectedAsStale;
         }
 
         LastMutationId = mutationId;
@@ -151,19 +156,24 @@ public sealed class SyncedAssignment
         ServerUpdatedAtUtc = serverUpdatedAtUtc.ToUniversalTime();
         DeletedAtUtc = null;
         Revision++;
-        return true;
+        return PersonalDataMutationApplyResult.Applied;
     }
 
-    public bool Delete(
+    public PersonalDataMutationApplyResult Delete(
         Guid mutationId,
         DateTimeOffset deletedAtUtc,
         DateTimeOffset serverUpdatedAtUtc)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(mutationId, Guid.Empty);
         DateTimeOffset normalizedDeletedAt = deletedAtUtc.ToUniversalTime();
-        if (mutationId == LastMutationId || normalizedDeletedAt < ClientUpdatedAtUtc)
+        if (mutationId == LastMutationId)
         {
-            return false;
+            return PersonalDataMutationApplyResult.AlreadyApplied;
+        }
+
+        if (normalizedDeletedAt < ClientUpdatedAtUtc)
+        {
+            return PersonalDataMutationApplyResult.RejectedAsStale;
         }
 
         LastMutationId = mutationId;
@@ -171,7 +181,7 @@ public sealed class SyncedAssignment
         ServerUpdatedAtUtc = serverUpdatedAtUtc.ToUniversalTime();
         DeletedAtUtc = normalizedDeletedAt;
         Revision++;
-        return true;
+        return PersonalDataMutationApplyResult.Applied;
     }
 
     private static void Validate(

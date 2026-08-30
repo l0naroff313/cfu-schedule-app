@@ -12,6 +12,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<SyncedAssignment> Assignments => Set<SyncedAssignment>();
 
+    public DbSet<PersonalDataMutationReceipt> PersonalDataMutationReceipts =>
+        Set<PersonalDataMutationReceipt>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -101,6 +104,26 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(assignment => new { assignment.InstallationId, assignment.ServerUpdatedAtUtc })
                 .HasDatabaseName("ix_assignments_installation_server_updated");
+        });
+
+        modelBuilder.Entity<PersonalDataMutationReceipt>(entity =>
+        {
+            entity.ToTable("personal_data_mutation_receipts");
+            entity.HasKey(receipt => new { receipt.InstallationId, receipt.MutationId });
+            entity.Property(receipt => receipt.InstallationId).HasColumnName("installation_id");
+            entity.Property(receipt => receipt.MutationId).HasColumnName("mutation_id");
+            entity.Property(receipt => receipt.EntityKind).HasColumnName("entity_kind").HasConversion<int>();
+            entity.Property(receipt => receipt.EntityId).HasColumnName("entity_id");
+            entity.Property(receipt => receipt.Outcome).HasColumnName("outcome").HasConversion<int>();
+            entity.Property(receipt => receipt.ProcessedAtUtc)
+                .HasColumnName("processed_at_utc")
+                .HasColumnType("timestamp with time zone");
+            entity.HasOne<Installation>()
+                .WithMany()
+                .HasForeignKey(receipt => receipt.InstallationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(receipt => receipt.ProcessedAtUtc)
+                .HasDatabaseName("ix_mutation_receipts_processed_at_utc");
         });
     }
 }

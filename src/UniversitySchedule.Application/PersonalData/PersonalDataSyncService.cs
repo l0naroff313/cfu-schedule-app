@@ -31,7 +31,19 @@ public sealed class PersonalDataSyncService(
             command.InstallationId,
             command.NoteId,
             cancellationToken);
-        bool wasApplied;
+        PersonalDataMutationReceipt? receipt = await repository.FindMutationReceiptAsync(
+            command.InstallationId,
+            command.MutationId,
+            cancellationToken);
+        if (receipt is not null)
+        {
+            ValidateReceipt(receipt, PersonalDataEntityKind.Note, command.NoteId);
+            return new PersonalDataSyncResult<SyncedNote>(
+                note ?? throw new InvalidOperationException("A mutation receipt exists without its note."),
+                FromReceipt(receipt));
+        }
+
+        PersonalDataMutationApplyResult applyResult;
 
         if (note is null)
         {
@@ -48,11 +60,11 @@ public sealed class PersonalDataSyncService(
                 command.UpdatedAtUtc,
                 serverNow);
             repository.AddNote(note);
-            wasApplied = true;
+            applyResult = PersonalDataMutationApplyResult.Applied;
         }
         else
         {
-            wasApplied = note.Apply(
+            applyResult = note.Apply(
                 command.MutationId,
                 command.LessonId,
                 text,
@@ -64,12 +76,16 @@ public sealed class PersonalDataSyncService(
                 serverNow);
         }
 
-        if (wasApplied)
-        {
-            await repository.SaveChangesAsync(cancellationToken);
-        }
+        AddReceipt(
+            command.InstallationId,
+            command.MutationId,
+            PersonalDataEntityKind.Note,
+            command.NoteId,
+            applyResult,
+            serverNow);
+        await repository.SaveChangesAsync(cancellationToken);
 
-        return new PersonalDataSyncResult<SyncedNote>(note, wasApplied);
+        return new PersonalDataSyncResult<SyncedNote>(note, FromApplyResult(applyResult));
     }
 
     public async Task<PersonalDataSyncResult<SyncedNote>> DeleteNoteAsync(
@@ -82,7 +98,19 @@ public sealed class PersonalDataSyncService(
             command.InstallationId,
             command.EntityId,
             cancellationToken);
-        bool wasApplied;
+        PersonalDataMutationReceipt? receipt = await repository.FindMutationReceiptAsync(
+            command.InstallationId,
+            command.MutationId,
+            cancellationToken);
+        if (receipt is not null)
+        {
+            ValidateReceipt(receipt, PersonalDataEntityKind.Note, command.EntityId);
+            return new PersonalDataSyncResult<SyncedNote>(
+                note ?? throw new InvalidOperationException("A mutation receipt exists without its note."),
+                FromReceipt(receipt));
+        }
+
+        PersonalDataMutationApplyResult applyResult;
 
         if (note is null)
         {
@@ -93,19 +121,23 @@ public sealed class PersonalDataSyncService(
                 command.DeletedAtUtc,
                 serverNow);
             repository.AddNote(note);
-            wasApplied = true;
+            applyResult = PersonalDataMutationApplyResult.Applied;
         }
         else
         {
-            wasApplied = note.Delete(command.MutationId, command.DeletedAtUtc, serverNow);
+            applyResult = note.Delete(command.MutationId, command.DeletedAtUtc, serverNow);
         }
 
-        if (wasApplied)
-        {
-            await repository.SaveChangesAsync(cancellationToken);
-        }
+        AddReceipt(
+            command.InstallationId,
+            command.MutationId,
+            PersonalDataEntityKind.Note,
+            command.EntityId,
+            applyResult,
+            serverNow);
+        await repository.SaveChangesAsync(cancellationToken);
 
-        return new PersonalDataSyncResult<SyncedNote>(note, wasApplied);
+        return new PersonalDataSyncResult<SyncedNote>(note, FromApplyResult(applyResult));
     }
 
     public async Task<PersonalDataSyncResult<SyncedAssignment>> UpsertAssignmentAsync(
@@ -120,7 +152,19 @@ public sealed class PersonalDataSyncService(
             command.InstallationId,
             command.AssignmentId,
             cancellationToken);
-        bool wasApplied;
+        PersonalDataMutationReceipt? receipt = await repository.FindMutationReceiptAsync(
+            command.InstallationId,
+            command.MutationId,
+            cancellationToken);
+        if (receipt is not null)
+        {
+            ValidateReceipt(receipt, PersonalDataEntityKind.Assignment, command.AssignmentId);
+            return new PersonalDataSyncResult<SyncedAssignment>(
+                assignment ?? throw new InvalidOperationException("A mutation receipt exists without its assignment."),
+                FromReceipt(receipt));
+        }
+
+        PersonalDataMutationApplyResult applyResult;
 
         if (assignment is null)
         {
@@ -137,11 +181,11 @@ public sealed class PersonalDataSyncService(
                 command.UpdatedAtUtc,
                 serverNow);
             repository.AddAssignment(assignment);
-            wasApplied = true;
+            applyResult = PersonalDataMutationApplyResult.Applied;
         }
         else
         {
-            wasApplied = assignment.Apply(
+            applyResult = assignment.Apply(
                 command.MutationId,
                 command.LessonId,
                 subject,
@@ -153,12 +197,16 @@ public sealed class PersonalDataSyncService(
                 serverNow);
         }
 
-        if (wasApplied)
-        {
-            await repository.SaveChangesAsync(cancellationToken);
-        }
+        AddReceipt(
+            command.InstallationId,
+            command.MutationId,
+            PersonalDataEntityKind.Assignment,
+            command.AssignmentId,
+            applyResult,
+            serverNow);
+        await repository.SaveChangesAsync(cancellationToken);
 
-        return new PersonalDataSyncResult<SyncedAssignment>(assignment, wasApplied);
+        return new PersonalDataSyncResult<SyncedAssignment>(assignment, FromApplyResult(applyResult));
     }
 
     public async Task<PersonalDataSyncResult<SyncedAssignment>> DeleteAssignmentAsync(
@@ -171,7 +219,19 @@ public sealed class PersonalDataSyncService(
             command.InstallationId,
             command.EntityId,
             cancellationToken);
-        bool wasApplied;
+        PersonalDataMutationReceipt? receipt = await repository.FindMutationReceiptAsync(
+            command.InstallationId,
+            command.MutationId,
+            cancellationToken);
+        if (receipt is not null)
+        {
+            ValidateReceipt(receipt, PersonalDataEntityKind.Assignment, command.EntityId);
+            return new PersonalDataSyncResult<SyncedAssignment>(
+                assignment ?? throw new InvalidOperationException("A mutation receipt exists without its assignment."),
+                FromReceipt(receipt));
+        }
+
+        PersonalDataMutationApplyResult applyResult;
 
         if (assignment is null)
         {
@@ -182,19 +242,68 @@ public sealed class PersonalDataSyncService(
                 command.DeletedAtUtc,
                 serverNow);
             repository.AddAssignment(assignment);
-            wasApplied = true;
+            applyResult = PersonalDataMutationApplyResult.Applied;
         }
         else
         {
-            wasApplied = assignment.Delete(command.MutationId, command.DeletedAtUtc, serverNow);
+            applyResult = assignment.Delete(command.MutationId, command.DeletedAtUtc, serverNow);
         }
 
-        if (wasApplied)
+        AddReceipt(
+            command.InstallationId,
+            command.MutationId,
+            PersonalDataEntityKind.Assignment,
+            command.EntityId,
+            applyResult,
+            serverNow);
+        await repository.SaveChangesAsync(cancellationToken);
+
+        return new PersonalDataSyncResult<SyncedAssignment>(assignment, FromApplyResult(applyResult));
+    }
+
+    private void AddReceipt(
+        Guid installationId,
+        Guid mutationId,
+        PersonalDataEntityKind entityKind,
+        Guid entityId,
+        PersonalDataMutationApplyResult applyResult,
+        DateTimeOffset processedAtUtc)
+    {
+        PersonalDataMutationOutcome outcome = applyResult == PersonalDataMutationApplyResult.RejectedAsStale
+            ? PersonalDataMutationOutcome.RejectedAsStale
+            : PersonalDataMutationOutcome.Applied;
+        repository.AddMutationReceipt(PersonalDataMutationReceipt.Create(
+            installationId,
+            mutationId,
+            entityKind,
+            entityId,
+            outcome,
+            processedAtUtc));
+    }
+
+    private static PersonalDataSyncDisposition FromApplyResult(PersonalDataMutationApplyResult result) =>
+        result switch
         {
-            await repository.SaveChangesAsync(cancellationToken);
-        }
+            PersonalDataMutationApplyResult.Applied => PersonalDataSyncDisposition.Applied,
+            PersonalDataMutationApplyResult.AlreadyApplied => PersonalDataSyncDisposition.AlreadyApplied,
+            PersonalDataMutationApplyResult.RejectedAsStale => PersonalDataSyncDisposition.Conflict,
+            _ => throw new InvalidOperationException($"Unsupported mutation result: {result}."),
+        };
 
-        return new PersonalDataSyncResult<SyncedAssignment>(assignment, wasApplied);
+    private static PersonalDataSyncDisposition FromReceipt(PersonalDataMutationReceipt receipt) =>
+        receipt.Outcome == PersonalDataMutationOutcome.Applied
+            ? PersonalDataSyncDisposition.AlreadyApplied
+            : PersonalDataSyncDisposition.Conflict;
+
+    private static void ValidateReceipt(
+        PersonalDataMutationReceipt receipt,
+        PersonalDataEntityKind entityKind,
+        Guid entityId)
+    {
+        if (receipt.EntityKind != entityKind || receipt.EntityId != entityId)
+        {
+            throw new MutationIdReuseException(receipt.MutationId);
+        }
     }
 
     private static void ValidateNote(NoteSyncCommand command)

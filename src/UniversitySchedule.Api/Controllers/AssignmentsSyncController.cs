@@ -26,7 +26,9 @@ public sealed class AssignmentsSyncController(PersonalDataSyncService syncServic
             installationId,
             includeDeleted,
             cancellationToken);
-        return Ok(assignments.Select(assignment => ToResponse(assignment, false)));
+        return Ok(assignments.Select(assignment => ToResponse(
+            assignment,
+            PersonalDataSyncDisposition.AlreadyApplied)));
     }
 
     [HttpPut("{assignmentId:guid}")]
@@ -45,20 +47,27 @@ public sealed class AssignmentsSyncController(PersonalDataSyncService syncServic
             return BadRequest();
         }
 
-        PersonalDataSyncResult<SyncedAssignment> result = await syncService.UpsertAssignmentAsync(
-            new AssignmentSyncCommand(
-                installationId,
-                assignmentId,
-                request.MutationId,
-                request.LessonId,
-                request.Subject,
-                request.Text,
-                request.DeadlineUtc,
-                (SyncedAssignmentStatus)request.Status,
-                request.CreatedAtUtc,
-                request.UpdatedAtUtc),
-            cancellationToken);
-        return Ok(ToResponse(result.Entity, result.WasApplied));
+        try
+        {
+            PersonalDataSyncResult<SyncedAssignment> result = await syncService.UpsertAssignmentAsync(
+                new AssignmentSyncCommand(
+                    installationId,
+                    assignmentId,
+                    request.MutationId,
+                    request.LessonId,
+                    request.Subject,
+                    request.Text,
+                    request.DeadlineUtc,
+                    (SyncedAssignmentStatus)request.Status,
+                    request.CreatedAtUtc,
+                    request.UpdatedAtUtc),
+                cancellationToken);
+            return ToMutationResponse(result);
+        }
+        catch (MutationIdReuseException)
+        {
+            return Conflict(CreateMutationReuseProblem());
+        }
     }
 
     [HttpDelete("{assignmentId:guid}")]
@@ -78,17 +87,43 @@ public sealed class AssignmentsSyncController(PersonalDataSyncService syncServic
             return BadRequest();
         }
 
-        PersonalDataSyncResult<SyncedAssignment> result = await syncService.DeleteAssignmentAsync(
-            new DeletePersonalDataCommand(
-                installationId,
-                assignmentId,
-                mutationId,
-                deletedAtUtc),
-            cancellationToken);
-        return Ok(ToResponse(result.Entity, result.WasApplied));
+        try
+        {
+            PersonalDataSyncResult<SyncedAssignment> result = await syncService.DeleteAssignmentAsync(
+                new DeletePersonalDataCommand(
+                    installationId,
+                    assignmentId,
+                    mutationId,
+                    deletedAtUtc),
+                cancellationToken);
+            return ToMutationResponse(result);
+        }
+        catch (MutationIdReuseException)
+        {
+            return Conflict(CreateMutationReuseProblem());
+        }
     }
 
-    private static SyncedAssignmentResponse ToResponse(SyncedAssignment assignment, bool wasApplied) =>
+    private ActionResult<SyncedAssignmentResponse> ToMutationResponse(
+        PersonalDataSyncResult<SyncedAssignment> result)
+    {
+        SyncedAssignmentResponse response = ToResponse(result.Entity, result.Disposition);
+        return result.Disposition == PersonalDataSyncDisposition.Conflict
+            ? Conflict(response)
+            : Ok(response);
+    }
+
+    private static ProblemDetails CreateMutationReuseProblem() =>
+        new()
+        {
+            Status = StatusCodes.Status409Conflict,
+            Title = "Идентификатор изменения уже использован",
+            Detail = "Повторите операцию с новым MutationId.",
+        };
+
+    private static SyncedAssignmentResponse ToResponse(
+        SyncedAssignment assignment,
+        PersonalDataSyncDisposition disposition) =>
         new(
             assignment.Id,
             assignment.LessonId,
@@ -101,5 +136,6 @@ public sealed class AssignmentsSyncController(PersonalDataSyncService syncServic
             assignment.ServerUpdatedAtUtc,
             assignment.DeletedAtUtc,
             assignment.Revision,
-            wasApplied);
+            disposition == PersonalDataSyncDisposition.Applied,
+            (SyncMutationDisposition)disposition);
 }

@@ -59,6 +59,17 @@ public sealed class EfPersonalDataRepository(AppDbContext dbContext) : IPersonal
 
     public void AddAssignment(SyncedAssignment assignment) => dbContext.Assignments.Add(assignment);
 
+    public async Task<PersonalDataMutationReceipt?> FindMutationReceiptAsync(
+        Guid installationId,
+        Guid mutationId,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.PersonalDataMutationReceipts.FindAsync(
+            [installationId, mutationId],
+            cancellationToken);
+
+    public void AddMutationReceipt(PersonalDataMutationReceipt receipt) =>
+        dbContext.PersonalDataMutationReceipts.Add(receipt);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         dbContext.SaveChangesAsync(cancellationToken);
 }

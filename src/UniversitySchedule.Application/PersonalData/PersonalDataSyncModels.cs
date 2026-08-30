@@ -32,4 +32,17 @@ public sealed record DeletePersonalDataCommand(
     Guid MutationId,
     DateTimeOffset DeletedAtUtc);
 
-public sealed record PersonalDataSyncResult<T>(T Entity, bool WasApplied);
+public enum PersonalDataSyncDisposition
+{
+    Applied = 0,
+    AlreadyApplied = 1,
+    Conflict = 2,
+}
+
+public sealed record PersonalDataSyncResult<T>(T Entity, PersonalDataSyncDisposition Disposition)
+{
+    public bool WasApplied => Disposition == PersonalDataSyncDisposition.Applied;
+}
+
+public sealed class MutationIdReuseException(Guid mutationId)
+    : Exception($"Mutation '{mutationId:D}' was already used for another entity.");
