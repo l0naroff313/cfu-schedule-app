@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\UniversitySchedule.Application\UniversitySchedule.Application.csproj" />
+    <ProjectReference Include="..\UniversitySchedule.Contracts\UniversitySchedule.Contracts.csproj" />
     <ProjectReference Include="..\UniversitySchedule.Domain\UniversitySchedule.Domain.csproj" />
   </ItemGroup>
 

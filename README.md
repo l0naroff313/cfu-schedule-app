@@ -66,6 +66,8 @@ UniversitySchedule.sln
 - анонимный установочный UUID и 256-битный секрет в Android Keystore/iOS Keychain без аппаратных или персональных идентификаторов;
 - серверная регистрация установки: HMAC-хеш секрета в PostgreSQL, короткоживущий JWT и изоляция данных по проверенному `installation_id`;
 - офлайн-очередь синхронизации создания, редактирования и удаления заметок/заданий с tombstones, серверным реестром идемпотентных мутаций, тремя повторами временных ошибок и сохраняемыми конфликтами;
+- ASP.NET Core API каталога и расписания с точным поиском преподавателя, текущей/следующей парой и проверенным PostgreSQL fallback при недоступности КФУ;
+- PostgreSQL-хранилище установок, личных данных, каталога, журнала публикаций и последних корректных документов официального API КФУ;
 - версионированные API-контракты и health endpoint;
 - unit-тесты доменной, прикладной и мобильной логики.
 
@@ -93,6 +95,35 @@ dotnet ef database update --project src/UniversitySchedule.Infrastructure
 dotnet run --project src/UniversitySchedule.Api
 ```
 
+Основные публичные серверные маршруты:
+
+```text
+GET /api/v1/catalog/snapshot
+GET /api/v1/catalog/institutes
+GET /api/v1/catalog/institutes/{id}/directions
+GET /api/v1/catalog/directions/{id}/groups
+GET /api/v1/catalog/groups/search?query=...
+GET /api/v1/catalog/teachers/search?query=...
+GET /api/v1/catalog/teachers/{id}
+GET /api/v1/schedule/groups/{id}
+GET /api/v1/schedule/groups/{id}/current
+GET /api/v1/schedule/teachers/{id}
+GET /api/v1/schedule/teachers/{id}/current
+GET /health/live
+GET /health/ready
+```
+
+Ответы расписания содержат `X-Schedule-Source: cfu-live` либо `postgresql-cache`. Сервер сохраняет только проверенный JSON официального API и при ошибке источника возвращает последнюю рабочую копию. OpenAPI доступен в Development или при `OpenApi__Enabled=true` по адресу `/openapi/v1.json`.
+
+Для локального запуска API и PostgreSQL через Docker скопируйте `.env.example` в `.env`, замените все секреты и выполните:
+
+```powershell
+docker compose up --build -d
+docker compose ps
+```
+
+Контейнер применяет EF Core-миграции при старте. В production рекомендуется завершать TLS на Caddy/Nginx; мобильный клиент намеренно не отправляет установочный секрет по HTTP.
+
 На Ubuntu те же значения задаются переменными окружения `ConnectionStrings__PostgreSql`, `InstallationAuthentication__SecretPepper` и `InstallationAuthentication__JwtSigningKey`. Секреты не входят в репозиторий.
 
 Чтобы мобильная сборка отправляла очередь на сервер, укажите доступный с телефона или эмулятора HTTPS-адрес в локальном `Directory.Build.local.props`:
@@ -108,6 +139,15 @@ dotnet run --project src/UniversitySchedule.Api
 ```powershell
 dotnet run --project src/UniversitySchedule.ScheduleImporter
 ```
+
+После запуска PostgreSQL существующий проверенный справочник можно опубликовать без повторного обхода сайтов:
+
+```powershell
+$env:ConnectionStrings__PostgreSql="Host=localhost;Port=5432;Database=cfu_schedule;Username=cfu_schedule;Password=YOUR_PASSWORD"
+dotnet run --project src/UniversitySchedule.ScheduleImporter -- --seed-postgres
+```
+
+Для полного обновления источников с одновременной записью файла и PostgreSQL используйте `--publish-postgres`.
 
 Для просмотра расписания сервер по-прежнему не требуется: мобильный клиент читает официальный HTTPS API КФУ и использует SQLite-кэш. ASP.NET Core API и PostgreSQL нужны только для серверной копии и синхронизации личных заметок и заданий.
 

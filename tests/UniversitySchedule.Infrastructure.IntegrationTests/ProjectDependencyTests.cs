@@ -12,6 +12,7 @@ public sealed class ProjectDependencyTests
             ["UniversitySchedule.Contracts"] = new HashSet<string>(StringComparer.Ordinal),
             ["UniversitySchedule.Infrastructure"] = Set(
                 "UniversitySchedule.Application",
+                "UniversitySchedule.Contracts",
                 "UniversitySchedule.Domain"),
             ["UniversitySchedule.Api"] = Set(
                 "UniversitySchedule.Application",

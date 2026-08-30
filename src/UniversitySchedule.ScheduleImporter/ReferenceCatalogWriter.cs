@@ -5,7 +5,7 @@ using UniversitySchedule.Contracts.Catalog;
 
 namespace UniversitySchedule.ScheduleImporter;
 
-public sealed class ReferenceCatalogWriter(ImportOptions options)
+public sealed class ReferenceCatalogWriter(ImportOptions options) : IReferenceCatalogSink
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

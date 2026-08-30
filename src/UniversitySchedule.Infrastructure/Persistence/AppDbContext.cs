@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using UniversitySchedule.Domain.Catalog;
 using UniversitySchedule.Domain.Identity;
 using UniversitySchedule.Domain.PersonalData;
+using UniversitySchedule.Domain.Scheduling;
 
 namespace UniversitySchedule.Infrastructure.Persistence;
 
@@ -14,6 +16,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     public DbSet<PersonalDataMutationReceipt> PersonalDataMutationReceipts =>
         Set<PersonalDataMutationReceipt>();
+
+    public DbSet<ReferenceCatalogDocument> ReferenceCatalogDocuments =>
+        Set<ReferenceCatalogDocument>();
+
+    public DbSet<ReferenceCatalogImportLog> ReferenceCatalogImportLogs =>
+        Set<ReferenceCatalogImportLog>();
+
+    public DbSet<ScheduleSourceDocument> ScheduleSourceDocuments =>
+        Set<ScheduleSourceDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -124,6 +135,77 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(receipt => receipt.ProcessedAtUtc)
                 .HasDatabaseName("ix_mutation_receipts_processed_at_utc");
+        });
+
+        modelBuilder.Entity<ReferenceCatalogDocument>(entity =>
+        {
+            entity.ToTable("reference_catalog_documents");
+            entity.HasKey(document => document.Id);
+            entity.Property(document => document.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(document => document.PayloadJson)
+                .HasColumnName("payload_json")
+                .HasColumnType("jsonb")
+                .IsRequired();
+            entity.Property(document => document.ContentHash)
+                .HasColumnName("content_hash")
+                .HasMaxLength(64)
+                .IsRequired();
+            entity.Property(document => document.SchemaVersion).HasColumnName("schema_version");
+            entity.Property(document => document.SourceGeneratedAtUtc)
+                .HasColumnName("source_generated_at_utc")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(document => document.ImportedAtUtc)
+                .HasColumnName("imported_at_utc")
+                .HasColumnType("timestamp with time zone");
+            entity.HasIndex(document => document.ContentHash)
+                .HasDatabaseName("ix_reference_catalog_content_hash");
+        });
+
+        modelBuilder.Entity<ReferenceCatalogImportLog>(entity =>
+        {
+            entity.ToTable("reference_catalog_import_logs");
+            entity.HasKey(log => log.Id);
+            entity.Property(log => log.Id).HasColumnName("id").ValueGeneratedNever();
+            entity.Property(log => log.StartedAtUtc)
+                .HasColumnName("started_at_utc")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(log => log.FinishedAtUtc)
+                .HasColumnName("finished_at_utc")
+                .HasColumnType("timestamp with time zone");
+            entity.Property(log => log.Status).HasColumnName("status").HasConversion<int>();
+            entity.Property(log => log.ContentHash)
+                .HasColumnName("content_hash")
+                .HasMaxLength(64);
+            entity.Property(log => log.ProgramCount).HasColumnName("program_count");
+            entity.Property(log => log.GroupCount).HasColumnName("group_count");
+            entity.Property(log => log.TeacherCount).HasColumnName("teacher_count");
+            entity.Property(log => log.ErrorMessage)
+                .HasColumnName("error_message")
+                .HasMaxLength(4_000);
+            entity.HasIndex(log => log.StartedAtUtc)
+                .HasDatabaseName("ix_reference_catalog_import_started_at");
+        });
+
+        modelBuilder.Entity<ScheduleSourceDocument>(entity =>
+        {
+            entity.ToTable("schedule_source_documents");
+            entity.HasKey(document => document.Key);
+            entity.Property(document => document.Key)
+                .HasColumnName("key")
+                .HasMaxLength(256);
+            entity.Property(document => document.SourceUrl)
+                .HasColumnName("source_url")
+                .HasMaxLength(1_000)
+                .IsRequired();
+            entity.Property(document => document.PayloadJson)
+                .HasColumnName("payload_json")
+                .HasColumnType("jsonb")
+                .IsRequired();
+            entity.Property(document => document.FetchedAtUtc)
+                .HasColumnName("fetched_at_utc")
+                .HasColumnType("timestamp with time zone");
+            entity.HasIndex(document => document.FetchedAtUtc)
+                .HasDatabaseName("ix_schedule_source_documents_fetched_at");
         });
     }
 }

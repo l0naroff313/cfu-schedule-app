@@ -6,7 +6,9 @@ public sealed record ImportOptions(
     string CacheDirectory,
     bool Refresh,
     bool SkipTeacherDetails,
-    TimeSpan VuzopediaCrawlDelay)
+    TimeSpan VuzopediaCrawlDelay,
+    bool PublishPostgreSql = false,
+    bool SeedPostgreSql = false)
 {
     public static ImportOptions Parse(IReadOnlyList<string> args, string contentRoot)
     {
@@ -25,6 +27,8 @@ public sealed record ImportOptions(
         string cacheDirectory = Path.Combine(repositoryRoot, "artifacts", "reference-import");
         bool refresh = false;
         bool skipTeacherDetails = false;
+        bool publishPostgreSql = false;
+        bool seedPostgreSql = false;
         double delaySeconds = 5;
 
         for (int index = 0; index < args.Count; index++)
@@ -54,6 +58,13 @@ public sealed record ImportOptions(
                     }
 
                     break;
+                case "--publish-postgres":
+                    publishPostgreSql = true;
+                    break;
+                case "--seed-postgres":
+                    publishPostgreSql = true;
+                    seedPostgreSql = true;
+                    break;
                 default:
                     throw new ArgumentException($"Unknown importer option: {args[index]}");
             }
@@ -65,7 +76,9 @@ public sealed record ImportOptions(
             Path.GetFullPath(cacheDirectory),
             refresh,
             skipTeacherDetails,
-            TimeSpan.FromSeconds(delaySeconds));
+            TimeSpan.FromSeconds(delaySeconds),
+            publishPostgreSql,
+            seedPostgreSql);
     }
 
     private static string RequireValue(IReadOnlyList<string> args, ref int index, string option)

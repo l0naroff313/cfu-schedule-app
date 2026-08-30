@@ -28,4 +28,17 @@ public sealed class SystemEndpointsTests : IClassFixture<ApiFactory>
         Assert.Equal("ok", payload.Status);
         Assert.Equal(TimeSpan.Zero, payload.ServerTimeUtc.Offset);
     }
+
+    [Fact]
+    public async Task Readiness_ChecksDatabase()
+    {
+        using HttpClient client = _factory.CreateClient();
+
+        using HttpResponseMessage response = await client.GetAsync(
+            "/health/ready",
+            CancellationToken.None);
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
+    }
 }
