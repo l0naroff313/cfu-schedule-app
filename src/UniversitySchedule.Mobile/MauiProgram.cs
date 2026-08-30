@@ -55,6 +55,9 @@ public static class MauiProgram
         });
         builder.Services.AddSingleton<PersonalDataSyncQueue>();
         builder.Services.AddSingleton<PersonalDataSynchronizer>();
+        builder.Services.AddSingleton<PersonalDataSnapshotRestorer>();
+        builder.Services.AddSingleton<Func<PersonalDataSnapshotRestorer>>(services =>
+            () => services.GetRequiredService<PersonalDataSnapshotRestorer>());
         builder.Services.AddSingleton<PersonalDataSyncCoordinator>();
         builder.Services.AddSingleton<PersonalDataConflictResolutionService>();
         builder.Services.AddSingleton<IPersonalDataChangeSink>(services =>

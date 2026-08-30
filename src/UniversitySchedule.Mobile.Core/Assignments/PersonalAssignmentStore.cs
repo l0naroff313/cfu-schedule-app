@@ -187,6 +187,70 @@ public sealed class PersonalAssignmentStore
         }
     }
 
+    public async Task<int> ApplySynchronizationSnapshotAsync(
+        IReadOnlyCollection<PersonalAssignment> activeAssignments,
+        IReadOnlyCollection<Guid> deletedAssignmentIds,
+        IReadOnlySet<Guid> protectedAssignmentIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(activeAssignments);
+        ArgumentNullException.ThrowIfNull(deletedAssignmentIds);
+        ArgumentNullException.ThrowIfNull(protectedAssignmentIds);
+        if (activeAssignments.Any(assignment => assignment.Id == Guid.Empty) ||
+            activeAssignments.Select(assignment => assignment.Id).Distinct().Count() !=
+            activeAssignments.Count ||
+            deletedAssignmentIds.Any(id => id == Guid.Empty) ||
+            deletedAssignmentIds.Distinct().Count() != deletedAssignmentIds.Count)
+        {
+            throw new ArgumentException("The synchronized assignment snapshot contains invalid identifiers.");
+        }
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            List<PersonalAssignment> assignments = (await GetAllAsync(cancellationToken)).ToList();
+            int changedCount = 0;
+            foreach (Guid deletedId in deletedAssignmentIds)
+            {
+                if (!protectedAssignmentIds.Contains(deletedId))
+                {
+                    changedCount += assignments.RemoveAll(assignment => assignment.Id == deletedId);
+                }
+            }
+
+            foreach (PersonalAssignment activeAssignment in activeAssignments)
+            {
+                if (protectedAssignmentIds.Contains(activeAssignment.Id))
+                {
+                    continue;
+                }
+
+                int index = assignments.FindIndex(assignment => assignment.Id == activeAssignment.Id);
+                if (index < 0)
+                {
+                    assignments.Add(activeAssignment);
+                    changedCount++;
+                }
+                else if (assignments[index] != activeAssignment)
+                {
+                    assignments[index] = activeAssignment;
+                    changedCount++;
+                }
+            }
+
+            if (changedCount > 0)
+            {
+                await SaveAllAsync(assignments, _timeProvider.GetUtcNow(), cancellationToken);
+            }
+
+            return changedCount;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     private Task SaveAllAsync(
         IReadOnlyCollection<PersonalAssignment> assignments,
         DateTimeOffset updatedAtUtc,

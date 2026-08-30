@@ -5,7 +5,8 @@ public sealed record PersonalDataSyncRunResult(
     int PendingCount,
     int ConflictCount,
     int FailedCount,
-    bool IsConfigured);
+    bool IsConfigured,
+    bool CanDownloadSnapshot);
 
 public sealed class PersonalDataSynchronizer(
     PersonalDataSyncQueue queue,
@@ -19,7 +20,7 @@ public sealed class PersonalDataSynchronizer(
         if (!apiClient.IsEnabled)
         {
             IReadOnlyList<PersonalDataSyncOperation> queued = await queue.GetPendingAsync(cancellationToken);
-            return BuildResult(0, queued, false);
+            return BuildResult(0, queued, false, false);
         }
 
         await _lock.WaitAsync(cancellationToken);
@@ -72,9 +73,10 @@ public sealed class PersonalDataSynchronizer(
                         return BuildResult(
                             synchronizedCount,
                             await queue.GetPendingAsync(cancellationToken),
-                            true);
+                            true,
+                            false);
                     case PersonalDataPushOutcome.NotConfigured:
-                        return BuildResult(synchronizedCount, operations, false);
+                        return BuildResult(synchronizedCount, operations, false, false);
                     default:
                         throw new InvalidOperationException(
                             $"Unsupported personal data push outcome: {pushResult.Outcome}.");
@@ -84,6 +86,7 @@ public sealed class PersonalDataSynchronizer(
             return BuildResult(
                 synchronizedCount,
                 await queue.GetPendingAsync(cancellationToken),
+                true,
                 true);
         }
         finally
@@ -95,11 +98,13 @@ public sealed class PersonalDataSynchronizer(
     private static PersonalDataSyncRunResult BuildResult(
         int synchronizedCount,
         IReadOnlyCollection<PersonalDataSyncOperation> operations,
-        bool isConfigured) =>
+        bool isConfigured,
+        bool canDownloadSnapshot) =>
         new(
             synchronizedCount,
             operations.Count(operation => operation.State == PersonalDataSyncOperationState.Pending),
             operations.Count(operation => operation.State == PersonalDataSyncOperationState.Conflict),
             operations.Count(operation => operation.State == PersonalDataSyncOperationState.Failed),
-            isConfigured);
+            isConfigured,
+            canDownloadSnapshot);
 }

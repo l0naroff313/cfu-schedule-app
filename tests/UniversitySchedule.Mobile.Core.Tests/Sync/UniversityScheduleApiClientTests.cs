@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using UniversitySchedule.Contracts.Identity;
+using UniversitySchedule.Contracts.PersonalData;
 using UniversitySchedule.Mobile.Core.Identity;
 using UniversitySchedule.Mobile.Core.Notes;
 using UniversitySchedule.Mobile.Core.Sync;
@@ -137,6 +138,43 @@ public sealed class UniversityScheduleApiClientTests
         Assert.Equal("{\"revision\":3}", result.ServerStateJson);
     }
 
+    [Fact]
+    public async Task DownloadSnapshotAsync_UsesInstallationTokenAndReadsSnapshot()
+    {
+        DateTimeOffset now = new(2026, 8, 30, 12, 0, 0, TimeSpan.Zero);
+        Guid noteId = Guid.NewGuid();
+        var snapshot = new PersonalDataSnapshotResponse(
+            now,
+            [new SyncedNoteResponse(
+                noteId,
+                null,
+                "Серверная заметка",
+                null,
+                null,
+                false,
+                now,
+                now,
+                now,
+                null,
+                1,
+                false,
+                SyncMutationDisposition.AlreadyApplied)],
+            []);
+        var handler = new RecordingHandler(now)
+        {
+            SnapshotContent = JsonContent.Create(snapshot),
+        };
+        UniversityScheduleApiClient client = CreateClient(handler, now);
+
+        PersonalDataSnapshotDownloadResult result = await client.DownloadSnapshotAsync();
+
+        Assert.Equal(PersonalDataSnapshotDownloadOutcome.Succeeded, result.Outcome);
+        Assert.Equal(noteId, Assert.Single(result.Snapshot!.Notes).Id);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal("api/v1/sync/snapshot", handler.Requests[1].Path);
+        Assert.Equal("Bearer test-access-token", handler.Requests[1].Authorization);
+    }
+
     private static UniversityScheduleApiClient CreateClient(
         RecordingHandler handler,
         DateTimeOffset now)
@@ -170,6 +208,8 @@ public sealed class UniversityScheduleApiClientTests
 
         public string? ConflictContent { get; init; }
 
+        public HttpContent? SnapshotContent { get; init; }
+
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -191,6 +231,14 @@ public sealed class UniversityScheduleApiClientTests
                         "Bearer",
                         _now.AddMinutes(15),
                         true)),
+                };
+            }
+
+            if (request.RequestUri.AbsolutePath.EndsWith("/sync/snapshot", StringComparison.Ordinal))
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = SnapshotContent ?? new StringContent("{}"),
                 };
             }
 

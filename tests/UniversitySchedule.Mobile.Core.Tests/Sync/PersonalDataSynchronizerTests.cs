@@ -33,6 +33,7 @@ public sealed class PersonalDataSynchronizerTests
         Assert.Equal(0, result.PendingCount);
         Assert.Equal(1, result.ConflictCount);
         Assert.Equal(0, result.FailedCount);
+        Assert.True(result.CanDownloadSnapshot);
         PersonalDataSyncOperation conflict = Assert.Single(await queue.GetPendingAsync());
         Assert.Equal(PersonalDataSyncOperationState.Conflict, conflict.State);
         Assert.Equal("{\"revision\":4}", conflict.ConflictServerStateJson);
@@ -58,6 +59,7 @@ public sealed class PersonalDataSynchronizerTests
         Assert.Equal(0, result.SynchronizedCount);
         Assert.Equal(1, result.PendingCount);
         Assert.Equal(0, result.ConflictCount);
+        Assert.False(result.CanDownloadSnapshot);
         PersonalDataSyncOperation pending = Assert.Single(await queue.GetPendingAsync());
         Assert.Equal(1, pending.AttemptCount);
         Assert.Equal("transient_retry_exhausted", pending.LastErrorCode);

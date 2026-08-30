@@ -188,6 +188,69 @@ public sealed class PersonalNoteStore
         }
     }
 
+    public async Task<int> ApplySynchronizationSnapshotAsync(
+        IReadOnlyCollection<PersonalNote> activeNotes,
+        IReadOnlyCollection<Guid> deletedNoteIds,
+        IReadOnlySet<Guid> protectedNoteIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(activeNotes);
+        ArgumentNullException.ThrowIfNull(deletedNoteIds);
+        ArgumentNullException.ThrowIfNull(protectedNoteIds);
+        if (activeNotes.Any(note => note.Id == Guid.Empty) ||
+            activeNotes.Select(note => note.Id).Distinct().Count() != activeNotes.Count ||
+            deletedNoteIds.Any(id => id == Guid.Empty) ||
+            deletedNoteIds.Distinct().Count() != deletedNoteIds.Count)
+        {
+            throw new ArgumentException("The synchronized note snapshot contains invalid identifiers.");
+        }
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            List<PersonalNote> notes = (await GetAllAsync(cancellationToken)).ToList();
+            int changedCount = 0;
+            foreach (Guid deletedId in deletedNoteIds)
+            {
+                if (!protectedNoteIds.Contains(deletedId))
+                {
+                    changedCount += notes.RemoveAll(note => note.Id == deletedId);
+                }
+            }
+
+            foreach (PersonalNote activeNote in activeNotes)
+            {
+                if (protectedNoteIds.Contains(activeNote.Id))
+                {
+                    continue;
+                }
+
+                int index = notes.FindIndex(note => note.Id == activeNote.Id);
+                if (index < 0)
+                {
+                    notes.Add(activeNote);
+                    changedCount++;
+                }
+                else if (notes[index] != activeNote)
+                {
+                    notes[index] = activeNote;
+                    changedCount++;
+                }
+            }
+
+            if (changedCount > 0)
+            {
+                await SaveAllAsync(notes, _timeProvider.GetUtcNow(), cancellationToken);
+            }
+
+            return changedCount;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     private Task SaveAllAsync(
         IReadOnlyCollection<PersonalNote> notes,
         DateTimeOffset updatedAtUtc,

@@ -5,7 +5,8 @@ namespace UniversitySchedule.Mobile.Core.Sync;
 
 public sealed class PersonalDataSyncCoordinator(
     PersonalDataSyncQueue queue,
-    PersonalDataSynchronizer synchronizer) : IPersonalDataChangeSink
+    PersonalDataSynchronizer synchronizer,
+    Func<PersonalDataSnapshotRestorer> snapshotRestorerFactory) : IPersonalDataChangeSink
 {
     private int _backgroundSyncRunning;
 
@@ -57,7 +58,11 @@ public sealed class PersonalDataSyncCoordinator(
     {
         try
         {
-            await synchronizer.SynchronizeAsync();
+            PersonalDataSyncRunResult result = await synchronizer.SynchronizeAsync();
+            if (result.CanDownloadSnapshot)
+            {
+                await snapshotRestorerFactory().RestoreAsync();
+            }
         }
         catch
         {

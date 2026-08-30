@@ -252,6 +252,53 @@ public sealed class PersonalDataSyncEndpointsTests : IClassFixture<ApiFactory>
         Assert.DoesNotContain(secondItems!, note => note.Text == "Первая установка");
     }
 
+    [Fact]
+    public async Task Snapshot_ReturnsActiveItemsAndTombstonesForCurrentInstallation()
+    {
+        using HttpClient client = await CreateAuthenticatedClientAsync();
+        DateTimeOffset createdAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+        Guid noteId = Guid.NewGuid();
+        Guid assignmentId = Guid.NewGuid();
+        await PutAsync<SyncedNoteResponse>(
+            client,
+            $"/api/v1/sync/notes/{noteId:D}",
+            new SyncNoteRequest(
+                Guid.NewGuid(),
+                null,
+                "Сохранённая заметка",
+                null,
+                "Алгоритмы",
+                false,
+                createdAt,
+                createdAt));
+        await PutAsync<SyncedAssignmentResponse>(
+            client,
+            $"/api/v1/sync/assignments/{assignmentId:D}",
+            new SyncAssignmentRequest(
+                Guid.NewGuid(),
+                null,
+                "Алгоритмы",
+                "Удалённое задание",
+                null,
+                AssignmentSyncStatus.New,
+                createdAt,
+                createdAt));
+        DateTimeOffset deletedAt = createdAt.AddMinutes(1);
+        using HttpResponseMessage deleteResponse = await client.DeleteAsync(
+            $"/api/v1/sync/assignments/{assignmentId:D}?mutationId={Guid.NewGuid():D}&deletedAtUtc={Uri.EscapeDataString(deletedAt.ToString("O"))}");
+        deleteResponse.EnsureSuccessStatusCode();
+
+        PersonalDataSnapshotResponse? snapshot = await client
+            .GetFromJsonAsync<PersonalDataSnapshotResponse>("/api/v1/sync/snapshot");
+
+        Assert.NotNull(snapshot);
+        Assert.NotEqual(default, snapshot.GeneratedAtUtc);
+        Assert.Contains(snapshot.Notes, note =>
+            note.Id == noteId && note.Text == "Сохранённая заметка" && !note.DeletedAtUtc.HasValue);
+        Assert.Contains(snapshot.Assignments, assignment =>
+            assignment.Id == assignmentId && assignment.DeletedAtUtc == deletedAt);
+    }
+
     private async Task<HttpClient> CreateAuthenticatedClientAsync()
     {
         HttpClient client = _factory.CreateClient();

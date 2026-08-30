@@ -25,6 +25,116 @@ public sealed class UniversityScheduleApiClient(
 
     public bool IsEnabled => options.IsEnabled;
 
+    public async Task<PersonalDataSnapshotDownloadResult> DownloadSnapshotAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsEnabled)
+        {
+            return new PersonalDataSnapshotDownloadResult(
+                PersonalDataSnapshotDownloadOutcome.NotConfigured,
+                0);
+        }
+
+        string? accessToken;
+        try
+        {
+            accessToken = await GetAccessTokenAsync(forceRefresh: false, cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            return SnapshotFailure("authentication_network_error");
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return SnapshotFailure("authentication_timeout");
+        }
+
+        if (accessToken is null)
+        {
+            return SnapshotFailure("authentication_unavailable");
+        }
+
+        string currentAccessToken = accessToken;
+        bool refreshedToken = false;
+        int requestCount = 0;
+        while (requestCount < MaximumPushRequests)
+        {
+            requestCount++;
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, "api/v1/sync/snapshot");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", currentAccessToken);
+                using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken);
+
+                if (response.StatusCode == HttpStatusCode.Unauthorized && !refreshedToken)
+                {
+                    refreshedToken = true;
+                    string? refreshedAccessToken = await GetAccessTokenAsync(
+                        forceRefresh: true,
+                        cancellationToken);
+                    if (refreshedAccessToken is null)
+                    {
+                        return SnapshotFailure("authentication_refresh_failed", requestCount);
+                    }
+
+                    currentAccessToken = refreshedAccessToken;
+                    continue;
+                }
+
+                if (IsSuccessful(response.StatusCode))
+                {
+                    PersonalDataSnapshotResponse? snapshot;
+                    try
+                    {
+                        snapshot = await response.Content
+                            .ReadFromJsonAsync<PersonalDataSnapshotResponse>(cancellationToken);
+                    }
+                    catch (System.Text.Json.JsonException)
+                    {
+                        return SnapshotPermanentFailure("invalid_snapshot", requestCount);
+                    }
+
+                    return IsValidSnapshot(snapshot)
+                        ? new PersonalDataSnapshotDownloadResult(
+                            PersonalDataSnapshotDownloadOutcome.Succeeded,
+                            requestCount,
+                            snapshot)
+                        : SnapshotPermanentFailure("invalid_snapshot", requestCount);
+                }
+
+                if (!IsTransient(response.StatusCode))
+                {
+                    return SnapshotPermanentFailure($"http_{(int)response.StatusCode}", requestCount);
+                }
+
+                if (requestCount < MaximumPushRequests)
+                {
+                    await DelayBeforeRetryAsync(response, requestCount, cancellationToken);
+                }
+            }
+            catch (HttpRequestException) when (requestCount < MaximumPushRequests)
+            {
+                await DelayBeforeRetryAsync(response: null, requestCount, cancellationToken);
+            }
+            catch (TaskCanceledException) when (
+                !cancellationToken.IsCancellationRequested &&
+                requestCount < MaximumPushRequests)
+            {
+                await DelayBeforeRetryAsync(response: null, requestCount, cancellationToken);
+            }
+            catch (HttpRequestException)
+            {
+                return SnapshotFailure("network_unavailable", requestCount);
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return SnapshotFailure("request_timeout", requestCount);
+            }
+        }
+
+        return SnapshotFailure("transient_retry_exhausted", requestCount);
+    }
+
     public async Task<PersonalDataPushResult> PushAsync(
         PersonalDataSyncOperation operation,
         CancellationToken cancellationToken = default)
@@ -365,4 +475,50 @@ public sealed class UniversityScheduleApiClient(
     private static bool IsTransient(HttpStatusCode statusCode) =>
         statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests ||
         (int)statusCode is >= 500 and <= 599;
+
+    private static bool IsValidSnapshot(PersonalDataSnapshotResponse? snapshot)
+    {
+        if (snapshot is null ||
+            snapshot.GeneratedAtUtc == default ||
+            snapshot.Notes is null ||
+            snapshot.Assignments is null ||
+            snapshot.Notes.Select(note => note.Id).Distinct().Count() != snapshot.Notes.Count ||
+            snapshot.Assignments.Select(assignment => assignment.Id).Distinct().Count() !=
+            snapshot.Assignments.Count)
+        {
+            return false;
+        }
+
+        return snapshot.Notes.All(note =>
+                   note.Id != Guid.Empty &&
+                   note.CreatedAtUtc != default &&
+                   note.UpdatedAtUtc != default &&
+                   note.Revision > 0 &&
+                   (note.DeletedAtUtc.HasValue || !string.IsNullOrWhiteSpace(note.Text))) &&
+               snapshot.Assignments.All(assignment =>
+                   assignment.Id != Guid.Empty &&
+                   assignment.CreatedAtUtc != default &&
+                   assignment.UpdatedAtUtc != default &&
+                   assignment.Revision > 0 &&
+                   Enum.IsDefined(assignment.Status) &&
+                   (assignment.DeletedAtUtc.HasValue ||
+                    (!string.IsNullOrWhiteSpace(assignment.Subject) &&
+                     !string.IsNullOrWhiteSpace(assignment.Text))));
+    }
+
+    private static PersonalDataSnapshotDownloadResult SnapshotFailure(
+        string errorCode,
+        int requestCount = 0) =>
+        new(
+            PersonalDataSnapshotDownloadOutcome.RetryableFailure,
+            requestCount,
+            ErrorCode: errorCode);
+
+    private static PersonalDataSnapshotDownloadResult SnapshotPermanentFailure(
+        string errorCode,
+        int requestCount) =>
+        new(
+            PersonalDataSnapshotDownloadOutcome.PermanentFailure,
+            requestCount,
+            ErrorCode: errorCode);
 }

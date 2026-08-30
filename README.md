@@ -67,6 +67,7 @@ UniversitySchedule.sln
 - серверная регистрация установки: HMAC-хеш секрета в PostgreSQL, короткоживущий JWT и изоляция данных по проверенному `installation_id`;
 - офлайн-очередь синхронизации создания, редактирования и удаления заметок/заданий с tombstones, серверным реестром идемпотентных мутаций, тремя повторами временных ошибок и сохраняемыми конфликтами;
 - экран ручного разрешения конфликтов заметок и заданий с безопасным выбором локальной либо серверной версии;
+- восстановление локальных заметок и заданий из единого серверного snapshot без перезаписи ожидающих офлайн-изменений;
 - ASP.NET Core API каталога и расписания с точным поиском преподавателя, текущей/следующей парой и проверенным PostgreSQL fallback при недоступности КФУ;
 - PostgreSQL-хранилище установок, личных данных, каталога, журнала публикаций и последних корректных документов официального API КФУ;
 - версионированные API-контракты и health endpoint;
@@ -96,7 +97,7 @@ dotnet ef database update --project src/UniversitySchedule.Infrastructure
 dotnet run --project src/UniversitySchedule.Api
 ```
 
-Основные публичные серверные маршруты:
+Основные серверные маршруты:
 
 ```text
 GET /api/v1/catalog/snapshot
@@ -110,9 +111,14 @@ GET /api/v1/schedule/groups/{id}
 GET /api/v1/schedule/groups/{id}/current
 GET /api/v1/schedule/teachers/{id}
 GET /api/v1/schedule/teachers/{id}/current
+GET /api/v1/sync/snapshot
+GET /api/v1/sync/notes
+GET /api/v1/sync/assignments
 GET /health/live
 GET /health/ready
 ```
+
+Маршруты `/api/v1/sync/*` требуют JWT, полученный после регистрации установки.
 
 Ответы расписания содержат `X-Schedule-Source: cfu-live` либо `postgresql-cache`. Сервер сохраняет только проверенный JSON официального API и при ошибке источника возвращает последнюю рабочую копию. OpenAPI доступен в Development или при `OpenApi__Enabled=true` по адресу `/openapi/v1.json`.
 
@@ -154,6 +160,5 @@ dotnet run --project src/UniversitySchedule.ScheduleImporter -- --seed-postgres
 
 ## Дальнейший план
 
-1. Добавить загрузку серверного snapshot в локальную SQLite-базу для восстановления данных после переустановки на той же идентичности.
-2. Автоматизировать регулярное обновление справочника и отчёта покрытия расписания.
-3. Реализовать уведомления, провести расширенные accessibility/UI-тесты на Android и iOS и подготовить release-сборки.
+1. Автоматизировать регулярное обновление справочника и отчёта покрытия расписания.
+2. Реализовать уведомления, провести расширенные accessibility/UI-тесты на Android и iOS и подготовить release-сборки.
