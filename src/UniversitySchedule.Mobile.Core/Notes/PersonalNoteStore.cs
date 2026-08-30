@@ -159,6 +159,35 @@ public sealed class PersonalNoteStore
             cancellationToken);
     }
 
+    public async Task ReplaceFromSynchronizationAsync(
+        Guid id,
+        PersonalNote? note,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(id, Guid.Empty);
+        if (note is not null && note.Id != id)
+        {
+            throw new ArgumentException("The synchronized note has another identifier.", nameof(note));
+        }
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            List<PersonalNote> notes = (await GetAllAsync(cancellationToken)).ToList();
+            notes.RemoveAll(item => item.Id == id);
+            if (note is not null)
+            {
+                notes.Add(note);
+            }
+
+            await SaveAllAsync(notes, _timeProvider.GetUtcNow(), cancellationToken);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     private Task SaveAllAsync(
         IReadOnlyCollection<PersonalNote> notes,
         DateTimeOffset updatedAtUtc,

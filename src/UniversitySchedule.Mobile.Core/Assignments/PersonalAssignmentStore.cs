@@ -156,6 +156,37 @@ public sealed class PersonalAssignmentStore
             cancellationToken);
     }
 
+    public async Task ReplaceFromSynchronizationAsync(
+        Guid id,
+        PersonalAssignment? assignment,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(id, Guid.Empty);
+        if (assignment is not null && assignment.Id != id)
+        {
+            throw new ArgumentException(
+                "The synchronized assignment has another identifier.",
+                nameof(assignment));
+        }
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            List<PersonalAssignment> assignments = (await GetAllAsync(cancellationToken)).ToList();
+            assignments.RemoveAll(item => item.Id == id);
+            if (assignment is not null)
+            {
+                assignments.Add(assignment);
+            }
+
+            await SaveAllAsync(assignments, _timeProvider.GetUtcNow(), cancellationToken);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     private Task SaveAllAsync(
         IReadOnlyCollection<PersonalAssignment> assignments,
         DateTimeOffset updatedAtUtc,

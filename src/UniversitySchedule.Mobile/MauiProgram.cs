@@ -56,6 +56,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<PersonalDataSyncQueue>();
         builder.Services.AddSingleton<PersonalDataSynchronizer>();
         builder.Services.AddSingleton<PersonalDataSyncCoordinator>();
+        builder.Services.AddSingleton<PersonalDataConflictResolutionService>();
         builder.Services.AddSingleton<IPersonalDataChangeSink>(services =>
             services.GetRequiredService<PersonalDataSyncCoordinator>());
         builder.Services.AddSingleton<ConnectivitySyncService>();
@@ -81,6 +82,7 @@ public static class MauiProgram
         builder.Services.AddTransient<SchedulePageViewModel>();
         builder.Services.AddTransient<NotesPageViewModel>();
         builder.Services.AddTransient<AssignmentsPageViewModel>();
+        builder.Services.AddTransient<SyncConflictsPageViewModel>();
         builder.Services.AddTransient<TodayPage>();
         builder.Services.AddTransient<SchedulePage>();
         builder.Services.AddTransient<AssignmentsPage>();
@@ -90,6 +92,7 @@ public static class MauiProgram
         builder.Services.AddTransient<SettingsPage>();
         builder.Services.AddTransient<NoteEditorPage>();
         builder.Services.AddTransient<AssignmentEditorPage>();
+        builder.Services.AddTransient<SyncConflictsPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

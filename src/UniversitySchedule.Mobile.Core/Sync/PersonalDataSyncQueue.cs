@@ -90,6 +90,70 @@ public sealed class PersonalDataSyncQueue(
         }
     }
 
+    public async Task<int> DiscardEntityOperationsAsync(
+        PersonalDataSyncEntityKind entityKind,
+        Guid entityId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(entityId, Guid.Empty);
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            List<PersonalDataSyncOperation> operations = (await GetPendingAsync(cancellationToken)).ToList();
+            int removed = operations.RemoveAll(operation =>
+                operation.EntityKind == entityKind && operation.EntityId == entityId);
+            if (removed > 0)
+            {
+                await SaveAsync(operations, timeProvider.GetUtcNow(), cancellationToken);
+            }
+
+            return removed;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task ReplaceEntityOperationsAsync(
+        PersonalDataSyncOperation replacement,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(replacement);
+        ArgumentOutOfRangeException.ThrowIfEqual(replacement.EntityId, Guid.Empty);
+        ArgumentOutOfRangeException.ThrowIfEqual(replacement.MutationId, Guid.Empty);
+        if (replacement.State != PersonalDataSyncOperationState.Pending)
+        {
+            throw new ArgumentException("A replacement sync operation must be pending.", nameof(replacement));
+        }
+
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            List<PersonalDataSyncOperation> operations = (await GetPendingAsync(cancellationToken)).ToList();
+            int firstIndex = operations.FindIndex(operation =>
+                operation.EntityKind == replacement.EntityKind &&
+                operation.EntityId == replacement.EntityId);
+            operations.RemoveAll(operation =>
+                operation.EntityKind == replacement.EntityKind &&
+                operation.EntityId == replacement.EntityId);
+            if (firstIndex < 0 || firstIndex > operations.Count)
+            {
+                operations.Add(replacement);
+            }
+            else
+            {
+                operations.Insert(firstIndex, replacement);
+            }
+
+            await SaveAsync(operations, timeProvider.GetUtcNow(), cancellationToken);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     public Task RecordRetryAsync(
         Guid mutationId,
         string errorCode,

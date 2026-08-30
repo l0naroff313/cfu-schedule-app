@@ -1,4 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
 using UniversitySchedule.Mobile.Core.Identity;
+using UniversitySchedule.Mobile.Core.Sync;
 using UniversitySchedule.Mobile.Services;
 
 namespace UniversitySchedule.Mobile.Pages;
@@ -7,14 +9,20 @@ public partial class SettingsPage : ContentPage
 {
     private readonly ThemeSettingsService _themeSettings;
     private readonly InstallationIdentityService _installationIdentity;
+    private readonly PersonalDataConflictResolutionService _conflictResolution;
+    private readonly IServiceProvider _services;
     private string? _installationId;
 
     public SettingsPage(
         ThemeSettingsService themeSettings,
-        InstallationIdentityService installationIdentity)
+        InstallationIdentityService installationIdentity,
+        PersonalDataConflictResolutionService conflictResolution,
+        IServiceProvider services)
     {
         _themeSettings = themeSettings;
         _installationIdentity = installationIdentity;
+        _conflictResolution = conflictResolution;
+        _services = services;
         InitializeComponent();
         RefreshStatus();
     }
@@ -23,6 +31,7 @@ public partial class SettingsPage : ContentPage
     {
         base.OnAppearing();
         await LoadInstallationIdentityAsync();
+        await LoadSyncConflictStatusAsync();
     }
 
     private void OnSystemThemeClicked(object? sender, EventArgs e) => SetTheme(AppTheme.Unspecified);
@@ -45,6 +54,12 @@ public partial class SettingsPage : ContentPage
 
         await Clipboard.Default.SetTextAsync(_installationId);
         await DisplayAlertAsync("Готово", "Идентификатор установки скопирован.", "OK");
+    }
+
+    private async void OnOpenSyncConflictsClicked(object? sender, EventArgs e)
+    {
+        var page = _services.GetRequiredService<SyncConflictsPage>();
+        await Navigation.PushModalAsync(page);
     }
 
     private void SetTheme(AppTheme theme)
@@ -77,6 +92,24 @@ public partial class SettingsPage : ContentPage
             _installationId = null;
             InstallationIdLabel.Text = "Защищённое хранилище недоступно";
             CopyInstallationIdButton.IsEnabled = false;
+        }
+    }
+
+    private async Task LoadSyncConflictStatusAsync()
+    {
+        try
+        {
+            int count = (await _conflictResolution.GetConflictsAsync()).Count;
+            SyncConflictStatusLabel.Text = count switch
+            {
+                0 => "Конфликтов нет",
+                1 => "Найден 1 конфликт",
+                _ => $"Найдено конфликтов: {count}",
+            };
+        }
+        catch (Exception)
+        {
+            SyncConflictStatusLabel.Text = "Не удалось проверить состояние";
         }
     }
 }

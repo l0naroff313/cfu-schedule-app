@@ -32,6 +32,19 @@
             </Border>
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="10">
+                    <Label Style="{StaticResource SectionTitle}" Text="Синхронизация" />
+                    <Label
+                        Style="{StaticResource SecondaryText}"
+                        Text="Если одна запись была изменена и на устройстве, и на сервере, выберите нужную версию вручную." />
+                    <Label
+                        x:Name="SyncConflictStatusLabel"
+                        Style="{StaticResource SecondaryText}"
+                        Text="Проверка конфликтов…" />
+                    <Button Clicked="OnOpenSyncConflictsClicked" Text="Открыть конфликты" />
+                </VerticalStackLayout>
+            </Border>
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="10">
                     <Label Style="{StaticResource SectionTitle}" Text="Это устройство" />
                     <Label
                         Style="{StaticResource SecondaryText}"
