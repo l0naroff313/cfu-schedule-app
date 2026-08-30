@@ -43,8 +43,8 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Select Xcode 26.5
-        run: sudo xcode-select --switch /Applications/Xcode_26.5.app/Contents/Developer
+      - name: Select Xcode 26.0
+        run: sudo xcode-select --switch /Applications/Xcode_26.0.app/Contents/Developer
 
       - name: Install the .NET MAUI workload
         run: dotnet workload install maui --skip-manifest-update
