@@ -28,6 +28,9 @@ public sealed class ThemeSettingsService
 #if ANDROID
         MainActivity.ApplySystemBars(theme);
 #endif
+#if IOS
+        IosAppearance.ApplySystemAppearance(theme);
+#endif
 
         Preferences.Default.Set(PreferenceKey, theme switch
         {

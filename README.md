@@ -62,7 +62,8 @@ UniversitySchedule.sln
 - заметки и домашние задания с привязкой к конкретной паре, локальным CRUD, дедлайнами, статусами, закреплением и SQLite-хранилищем;
 - навигация расписания по дням и неделям стрелками, касанием даты или выбором произвольного дня в календаре, а также быстрые действия «добавить заметку/задание» из карточки пары;
 - пять вкладок, выровненные с финальными светлой и тёмной дизайн-досками, включая карточки, фильтры, пустые состояния и профильную статистику;
-- экран настроек с явными кнопками выхода, системной/светлой/тёмной темами и корректным оформлением системных панелей Android;
+- экран настроек с явными кнопками выхода, системной/светлой/тёмной темами и корректным оформлением системных панелей Android и iOS;
+- iOS-оформление по финальным доскам: safe area для Dynamic Island/выреза, непрозрачная нижняя панель в цветах темы и Privacy Manifest для локальных настроек;
 - анонимный установочный UUID и 256-битный секрет в Android Keystore/iOS Keychain без аппаратных или персональных идентификаторов;
 - серверная регистрация установки: HMAC-хеш секрета в PostgreSQL, короткоживущий JWT и изоляция данных по проверенному `installation_id`;
 - офлайн-очередь синхронизации создания, редактирования и удаления заметок/заданий с tombstones, серверным реестром идемпотентных мутаций, тремя повторами временных ошибок и сохраняемыми конфликтами;
@@ -85,6 +86,22 @@ dotnet test UniversitySchedule.sln --no-build --no-restore
 ```
 
 Для Android также нужны Android SDK и JDK 21. Локальные пути можно указать в `Directory.Build.local.props`, скопировав `Directory.Build.local.props.example`; локальный файл исключён из Git.
+
+Пробный универсальный APK без AOT собирается так:
+
+```powershell
+dotnet publish src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj -c Release -f net10.0-android --no-restore -p:AndroidPackageFormats=apk -p:RunAOTCompilation=false -p:PublishTrimmed=false
+```
+
+Подписанный тестовым ключом файл появится в `src/UniversitySchedule.Mobile/bin/Release/net10.0-android/publish/`. Он содержит `arm64-v8a` для современного телефона и `x86_64` для эмулятора. На телефоне потребуется разрешить установку приложений из выбранного файлового менеджера или браузера.
+
+Исходники iOS используют те же пять XAML-экранов и обе темы. На Windows можно проверить компиляцию C# и XAML:
+
+```powershell
+dotnet build src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj -c Debug -f net10.0-ios -p:RuntimeIdentifier=iossimulator-x64 --no-restore
+```
+
+Для запуска iPhone Simulator, создания `.ipa`, подписи и установки на iPhone необходимы Mac с Xcode и учётная запись Apple Developer. На Apple Silicon для симулятора используется `iossimulator-arm64`, для устройства — `ios-arm64`.
 
 API запускается командой:
 

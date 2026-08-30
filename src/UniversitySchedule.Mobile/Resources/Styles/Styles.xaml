@@ -5,6 +5,7 @@
 
     <Style TargetType="ContentPage">
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}" />
+        <Setter Property="SafeAreaEdges" Value="{OnPlatform Default=None, iOS=Container}" />
     </Style>
 
     <Style TargetType="Label">
