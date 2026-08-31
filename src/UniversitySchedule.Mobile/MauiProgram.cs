@@ -28,7 +28,12 @@ public static class MauiProgram
             });
 
         builder.Services.AddSingleton<AppShell>();
+#if VISUAL_SNAPSHOTS
+        builder.Services.AddSingleton<TimeProvider, VisualSnapshotTimeProvider>();
+        builder.Services.AddSingleton<VisualSnapshotService>();
+#else
         builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+#endif
         builder.Services.AddSingleton<UniversitySchedule.Mobile.Core.Storage.ILocalDataStore, SqliteLocalDataStore>();
         builder.Services.AddSingleton<ISecureValueStore, MauiSecureValueStore>();
         builder.Services.AddSingleton<InstallationIdentityService>();

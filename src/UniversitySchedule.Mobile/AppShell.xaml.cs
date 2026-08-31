@@ -50,6 +50,27 @@ public partial class AppShell : Shell
         }
 
         _startupChecked = true;
+#if VISUAL_SNAPSHOTS
+        if (VisualSnapshotOptions.TryRead(out VisualSnapshotOptions visualOptions))
+        {
+            VisualSnapshotService visualSnapshots =
+                _services.GetRequiredService<VisualSnapshotService>();
+            await visualSnapshots.PrepareProfileAsync();
+            try
+            {
+                await _scheduleSession.InitializeAsync();
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Visual snapshot schedule refresh failed");
+            }
+
+            await visualSnapshots.SeedPersonalDataAsync(_scheduleSession.Snapshot);
+            await GoToAsync($"//{visualOptions.Route}", animate: false);
+            await visualSnapshots.MarkReadyAsync(visualOptions);
+            return;
+        }
+#endif
         try
         {
             await _installationIdentity.GetOrCreateAsync();

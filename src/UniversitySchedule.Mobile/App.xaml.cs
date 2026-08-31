@@ -12,6 +12,12 @@ public partial class App : Application
         _appShell = appShell;
         InitializeComponent();
         themeSettings.ApplySavedTheme();
+#if VISUAL_SNAPSHOTS
+        if (VisualSnapshotOptions.TryRead(out VisualSnapshotOptions options))
+        {
+            UserAppTheme = options.Theme;
+        }
+#endif
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

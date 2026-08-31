@@ -105,6 +105,8 @@ dotnet build src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj -c D
 
 Workflow `iOS` дополнительно выполняет Release-сборку на Apple Silicon runner `macos-26` с Xcode 26.2 и установленным iOS 26.2 Simulator Runtime. Проверка точного minor-релиза Xcode отключена, поскольку закреплённый .NET iOS workload рекомендует Xcode 26.0, отсутствующий на runner вместе с соответствующим runtime. Успешный запуск публикует на 14 дней артефакт `CFU-ElJournal-iOS-Simulator`; это приложение только для iPhone Simulator, не устанавливаемый на физический iPhone `.ipa`.
 
+В CI эта simulator-сборка включает изолированный режим визуальной проверки, которого нет в обычной сборке без `VisualSnapshots=true`. Workflow запускает приложение на iPhone 17 Pro с реальным расписанием группы `ПИ-б-о-252`, первой подгруппы, добавляет локальные демонстрационные заметки и задания и публикует десять снимков пяти вкладок в светлой и тёмной темах как артефакт `CFU-ElJournal-iOS-Screenshots`.
+
 API запускается командой:
 
 ```powershell
