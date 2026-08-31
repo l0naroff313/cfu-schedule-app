@@ -114,7 +114,8 @@ jobs:
             for tab in today schedule assignments notes profile; do
               MARKER="$APP_CONTAINER/Library/Caches/visual-snapshot-ready-$theme-$tab"
               rm -f "$MARKER"
-              xcrun simctl launch --terminate-running "$DEVICE_UDID" "$BUNDLE_ID" \
+              xcrun simctl terminate "$DEVICE_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+              xcrun simctl launch "$DEVICE_UDID" "$BUNDLE_ID" \
                 "--visual-snapshot=$tab" \
                 "--visual-theme=$theme"
 
