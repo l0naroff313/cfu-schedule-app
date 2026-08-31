@@ -10,9 +10,27 @@ public sealed class CfuScheduleIndexDocument
     [JsonPropertyName("weeks")]
     public CfuWeeksDocument Weeks { get; init; } = new();
 
+    [JsonPropertyName("now")]
+    public CfuCurrentWeekDocument CurrentWeek { get; init; } = new();
+
     [JsonPropertyName("tree")]
     public IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>> Tree { get; init; }
         = new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>>();
+}
+
+public sealed class CfuCurrentWeekDocument
+{
+    [JsonPropertyName("parity")]
+    public string Parity { get; init; } = string.Empty;
+
+    [JsonPropertyName("manual")]
+    public bool IsManual { get; init; }
+
+    [JsonPropertyName("mon")]
+    public string Monday { get; init; } = string.Empty;
+
+    [JsonPropertyName("note")]
+    public string? Note { get; init; }
 }
 
 public sealed class CfuBellDocument

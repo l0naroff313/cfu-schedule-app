@@ -111,7 +111,7 @@ jobs:
           APP_CONTAINER=$(xcrun simctl get_app_container "$DEVICE_UDID" "$BUNDLE_ID" data)
           for theme in light dark; do
             xcrun simctl ui "$DEVICE_UDID" appearance "$theme"
-            for tab in today schedule assignments notes profile; do
+            for tab in schedule assignments notes profile today; do
               MARKER="$APP_CONTAINER/Library/Caches/visual-snapshot-ready-$theme-$tab"
               rm -f "$MARKER"
               xcrun simctl terminate "$DEVICE_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true

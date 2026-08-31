@@ -47,6 +47,37 @@ public sealed class CfuScheduleMapperTests
     }
 
     [Fact]
+    public void GroupSchedule_IncludesCurrentWeekPublishedOutsideSemesterArrays()
+    {
+        CfuScheduleIndexDocument index = CreateIndex();
+        index = new CfuScheduleIndexDocument
+        {
+            Bells = index.Bells,
+            Weeks = index.Weeks,
+            Tree = index.Tree,
+            CurrentWeek = new CfuCurrentWeekDocument
+            {
+                Parity = "нечёт",
+                IsManual = true,
+                Monday = "2026-08-31",
+                Note = "Первая учебная неделя года!",
+            },
+        };
+        var schedule = new CfuGroupScheduleDocument
+        {
+            Code = "МАТ-б-о-251",
+            Lessons = [CreateLesson("Ручная первая неделя", subgroup: 0, parity: "нечёт")],
+        };
+
+        Contracts.Schedule.ScheduleSnapshot result = CfuScheduleMapper.MapGroup(index, schedule);
+
+        Assert.Contains(result.Lessons, lesson =>
+            lesson.Subject == "Ручная первая неделя" &&
+            lesson.Date == new DateOnly(2026, 8, 31));
+        Assert.Equal(new DateOnly(2026, 8, 31), result.From);
+    }
+
+    [Fact]
     public void StableId_IsRepeatableAndNormalizesWhitespaceAndYo()
     {
         Guid first = CfuStableId.Create("teacher", "Алёна   Иванова");

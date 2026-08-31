@@ -88,8 +88,8 @@ public static class CfuScheduleMapper
                     _ = TryParseTime(bell.EndsAt, out TimeOnly end);
                     return (start, end);
                 });
-        DateOnly[] evenMondays = ParseDates(index.Weeks.EvenWeekMondays);
-        DateOnly[] oddMondays = ParseDates(index.Weeks.OddWeekMondays);
+        DateOnly[] evenMondays = ResolveWeekMondays(index, isEven: true);
+        DateOnly[] oddMondays = ResolveWeekMondays(index, isEven: false);
         var result = new Dictionary<Guid, ScheduleLesson>();
 
         foreach (CfuLessonDocument lesson in sourceLessons)
@@ -264,8 +264,8 @@ public static class CfuScheduleMapper
         CfuScheduleIndexDocument index,
         IReadOnlyList<ScheduleLesson> lessons)
     {
-        DateOnly[] semesterDates = ParseDates(index.Weeks.EvenWeekMondays)
-            .Concat(ParseDates(index.Weeks.OddWeekMondays))
+        DateOnly[] semesterDates = ResolveWeekMondays(index, isEven: true)
+            .Concat(ResolveWeekMondays(index, isEven: false))
             .OrderBy(date => date)
             .ToArray();
         if (semesterDates.Length > 0)
@@ -299,6 +299,29 @@ public static class CfuScheduleMapper
             .Distinct()
             .OrderBy(date => date)
             .ToArray();
+    }
+
+    private static DateOnly[] ResolveWeekMondays(
+        CfuScheduleIndexDocument index,
+        bool isEven)
+    {
+        IEnumerable<DateOnly> mondays = ParseDates(isEven
+            ? index.Weeks.EvenWeekMondays
+            : index.Weeks.OddWeekMondays);
+        string currentParity = index.CurrentWeek.Parity
+            .Trim()
+            .ToLowerInvariant()
+            .Replace('ё', 'е');
+        bool currentWeekMatches = isEven
+            ? currentParity is "чет" or "четная" or "четная неделя"
+            : currentParity is "нечет" or "нечетная" or "нечетная неделя";
+        if (currentWeekMatches &&
+            TryParseDate(index.CurrentWeek.Monday, out DateOnly currentMonday))
+        {
+            mondays = mondays.Append(currentMonday);
+        }
+
+        return mondays.Distinct().OrderBy(date => date).ToArray();
     }
 
     private static bool TryParsePeriodStart(string value, out DateOnly result)

@@ -18,6 +18,9 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+#if IOS
+        IosSearchBarAppearance.Configure();
+#endif
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
