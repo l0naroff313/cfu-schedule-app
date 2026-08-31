@@ -124,11 +124,16 @@ public partial class SchedulePage : ContentPage
         }
     }
 
-    private void OnDateTapped(object? sender, TappedEventArgs e)
+    private void OnWeekDateSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (sender is TapGestureRecognizer { CommandParameter: ScheduleDateItem date })
+        if (e.CurrentSelection.FirstOrDefault() is ScheduleDateItem date)
         {
-            _viewModel.SelectDate(date.Date);
+            _viewModel.SelectedDateItem = date;
+        }
+
+        if (sender is CollectionView collectionView)
+        {
+            collectionView.SelectedItem = null;
         }
     }
 

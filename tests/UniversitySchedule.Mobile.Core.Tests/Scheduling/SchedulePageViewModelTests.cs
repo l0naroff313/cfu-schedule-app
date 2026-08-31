@@ -60,6 +60,21 @@ public sealed class SchedulePageViewModelTests
     }
 
     [Fact]
+    public void SelectingWeekDay_UpdatesTheDisplayedDate()
+    {
+        SchedulePageViewModel viewModel = CreateViewModel();
+        ScheduleDateItem friday = Assert.Single(
+            viewModel.WeekDates,
+            item => item.Date.DayOfWeek == DayOfWeek.Friday);
+
+        viewModel.SelectedDateItem = friday;
+
+        Assert.Equal(friday.Date, viewModel.SelectedDate);
+        Assert.Contains(friday.Date.Day.ToString(), viewModel.PeriodText);
+        Assert.Single(viewModel.WeekDates, item => item.IsSelected && item.Date == friday.Date);
+    }
+
+    [Fact]
     public void TeacherQuery_FiltersNamesIgnoringCaseWhitespaceAndYo()
     {
         SchedulePageViewModel viewModel = CreateViewModel();

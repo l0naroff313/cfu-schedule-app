@@ -349,8 +349,6 @@ public sealed class SchedulePageViewModel : ObservableObject
         }
     }
 
-    public void SelectDate(DateOnly date) => SelectedDate = date;
-
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         if (_scheduleSession is null)

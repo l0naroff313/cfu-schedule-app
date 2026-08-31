@@ -226,7 +226,8 @@
                 HorizontalScrollBarVisibility="Never"
                 ItemsSource="{Binding WeekDates}"
                 ItemsLayout="HorizontalList"
-                SelectionMode="None">
+                SelectionChanged="OnWeekDateSelectionChanged"
+                SelectionMode="Single">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="viewModels:ScheduleDateItem">
                         <Border
@@ -236,9 +237,6 @@
                             Stroke="{AppThemeBinding Light={StaticResource OutlineLight}, Dark={StaticResource OutlineDark}}"
                             StrokeShape="RoundRectangle 10"
                             WidthRequest="44">
-                            <Border.GestureRecognizers>
-                                <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnDateTapped" />
-                            </Border.GestureRecognizers>
                             <Border.Triggers>
                                 <DataTrigger Binding="{Binding IsSelected}" TargetType="Border" Value="True">
                                     <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
@@ -301,7 +299,10 @@
                                     BackgroundColor="{AppThemeBinding Light={StaticResource SegmentTrackLight}, Dark={StaticResource SegmentTrackDark}}"
                                     StrokeThickness="0"
                                     StrokeShape="RoundRectangle 10">
-                                    <VerticalStackLayout HorizontalOptions="Center" Spacing="2">
+                                    <VerticalStackLayout
+                                        HorizontalOptions="Center"
+                                        Spacing="2"
+                                        VerticalOptions="Center">
                                         <Label
                                             HorizontalTextAlignment="Center"
                                             Style="{StaticResource SectionTitle}"

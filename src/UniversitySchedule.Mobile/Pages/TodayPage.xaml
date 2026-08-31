@@ -61,7 +61,10 @@
                             BackgroundColor="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}"
                             StrokeThickness="0"
                             StrokeShape="RoundRectangle 12">
-                            <VerticalStackLayout HorizontalOptions="Center" Spacing="1">
+                            <VerticalStackLayout
+                                HorizontalOptions="Center"
+                                Spacing="1"
+                                VerticalOptions="Center">
                                 <Label HorizontalTextAlignment="Center" Style="{StaticResource SectionTitle}" Text="{Binding PairText}" />
                                 <Label HorizontalTextAlignment="Center" Style="{StaticResource SecondaryText}" Text="{Binding TimeText}" />
                             </VerticalStackLayout>
