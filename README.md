@@ -101,13 +101,13 @@ dotnet publish src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj -c
 dotnet build src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj -c Debug -f net10.0-ios -p:RuntimeIdentifier=iossimulator-x64 --no-restore
 ```
 
-Для запуска iPhone Simulator, создания `.ipa`, подписи и установки на iPhone необходимы Mac с Xcode и учётная запись Apple Developer. На Apple Silicon для симулятора используется `iossimulator-arm64`, для устройства — `ios-arm64`.
+Для локального запуска iPhone Simulator нужен Mac с Xcode. В этом репозитории macOS-сборку выполняет GitHub Actions, поэтому владельцу проекта отдельный Mac не требуется. Подпись `.ipa`, TestFlight и установка на физический iPhone всё равно требуют активного Apple Developer. На Apple Silicon для симулятора используется `iossimulator-arm64`, для устройства — `ios-arm64`.
 
 Workflow `iOS` дополнительно выполняет Release-сборку на Apple Silicon runner `macos-26` с Xcode 26.2 и установленным iOS 26.2 Simulator Runtime. Проверка точного minor-релиза Xcode отключена, поскольку закреплённый .NET iOS workload рекомендует Xcode 26.0, отсутствующий на runner вместе с соответствующим runtime. Успешный запуск публикует на 14 дней артефакт `CFU-ElJournal-iOS-Simulator`; это приложение только для iPhone Simulator, не устанавливаемый на физический iPhone `.ipa`.
 
 В CI эта simulator-сборка включает изолированный режим визуальной проверки, которого нет в обычной сборке без `VisualSnapshots=true`. Workflow запускает приложение на iPhone 17 Pro с реальным расписанием группы `ПИ-б-о-252`, первой подгруппы, добавляет локальные демонстрационные заметки и задания и публикует десять снимков пяти вкладок в светлой и тёмной темах как артефакт `CFU-ElJournal-iOS-Screenshots`.
 
-Ручной workflow `iOS Device` создаёт подписанный артефакт `CFU-ElJournal-iOS-Signed` для физического iPhone. Сертификат и provisioning profile не хранятся в репозитории: перед запуском добавьте в GitHub Actions Secrets значения `IOS_DISTRIBUTION_CERTIFICATE_BASE64`, `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD` и `IOS_PROVISIONING_PROFILE_BASE64`. Профиль должен принадлежать приложению `io.github.l0naroff313.cfuschedule`; для прямой Ad Hoc-установки он также должен содержать UDID нужного iPhone. Подготовка профиля описана в [документации .NET MAUI](https://learn.microsoft.com/dotnet/maui/ios/deployment/publish-ad-hoc?view=net-maui-10.0), а безопасный импорт материалов подписи в macOS runner — в [документации GitHub Actions](https://docs.github.com/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications).
+Workflow `iOS TestFlight` на каждом изменении бесплатно проверяет публичную конфигурацию iOS и не запрашивает Apple-секреты. Ручной запуск с `upload_to_testflight=true` после активации Apple Developer создаст App Store-подписанный `.ipa`, проверит его и загрузит в TestFlight через App Store Connect API key. Сертификат, provisioning profile и `.p8` хранятся только в GitHub Actions Secrets. Полная инструкция и список секретов находятся в [документации TestFlight](docs/ios-testflight.md).
 
 API запускается командой:
 

@@ -42,4 +42,6 @@ coverage/
 # Local tool caches
 .dotnet/
 .nuget/
+__pycache__/
+*.py[cod]
 Directory.Build.local.props
