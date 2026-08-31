@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using UniversitySchedule.Contracts.Catalog;
 using UniversitySchedule.Contracts.Schedule;
 using UniversitySchedule.Mobile.Core.Assignments;
+using UniversitySchedule.Mobile.Core.Catalog;
 using UniversitySchedule.Mobile.Core.Presentation;
 
 namespace UniversitySchedule.Mobile.Core.Scheduling;
@@ -39,22 +41,29 @@ public sealed class TodayPageViewModel : ObservableObject
     private readonly TimeProvider _timeProvider;
     private readonly ScheduleSession _scheduleSession;
     private readonly PersonalAssignmentStore _assignmentStore;
+    private readonly IReferenceCatalogProvider _referenceCatalogProvider;
+    private ReferenceCatalogSnapshot? _referenceCatalog;
     private IReadOnlyList<PersonalAssignment> _assignments = [];
     private TodayLessonCard? _currentLesson;
     private TodayLessonCard? _nextLesson;
     private string _dateText = string.Empty;
     private string _groupText = "Учебный профиль не выбран";
+    private string _weekParityText = string.Empty;
     private string _statusText = "Выберите группу, чтобы загрузить расписание.";
+    private bool _hasWeekParity;
     private bool _isLoading;
 
     public TodayPageViewModel(
         TimeProvider timeProvider,
         ScheduleSession scheduleSession,
-        PersonalAssignmentStore assignmentStore)
+        PersonalAssignmentStore assignmentStore,
+        IReferenceCatalogProvider referenceCatalogProvider)
     {
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _scheduleSession = scheduleSession ?? throw new ArgumentNullException(nameof(scheduleSession));
         _assignmentStore = assignmentStore ?? throw new ArgumentNullException(nameof(assignmentStore));
+        _referenceCatalogProvider = referenceCatalogProvider
+            ?? throw new ArgumentNullException(nameof(referenceCatalogProvider));
         _scheduleSession.Changed += OnScheduleChanged;
     }
 
@@ -106,6 +115,18 @@ public sealed class TodayPageViewModel : ObservableObject
         private set => SetProperty(ref _groupText, value);
     }
 
+    public string WeekParityText
+    {
+        get => _weekParityText;
+        private set => SetProperty(ref _weekParityText, value);
+    }
+
+    public bool HasWeekParity
+    {
+        get => _hasWeekParity;
+        private set => SetProperty(ref _hasWeekParity, value);
+    }
+
     public string StatusText
     {
         get => _statusText;
@@ -124,6 +145,7 @@ public sealed class TodayPageViewModel : ObservableObject
         try
         {
             await _scheduleSession.InitializeAsync(cancellationToken);
+            _referenceCatalog = await _referenceCatalogProvider.LoadAsync(cancellationToken);
             _assignments = await _assignmentStore.GetAllAsync(cancellationToken);
             Refresh();
         }
@@ -139,6 +161,9 @@ public sealed class TodayPageViewModel : ObservableObject
         DateTimeOffset universityNow = now.ToOffset(UniversityUtcOffset);
         DateOnly today = DateOnly.FromDateTime(universityNow.DateTime);
         DateText = Capitalize(universityNow.ToString("dddd, d MMMM", RussianCulture));
+        AcademicWeekParity parity = AcademicWeekParityResolver.Resolve(today, _referenceCatalog?.Calendar);
+        WeekParityText = AcademicWeekParityResolver.Format(parity);
+        HasWeekParity = parity != AcademicWeekParity.Unknown;
 
         if (_scheduleSession.Profile is null || _scheduleSession.Snapshot is null)
         {

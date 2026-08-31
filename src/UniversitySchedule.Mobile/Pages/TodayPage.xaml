@@ -14,6 +14,13 @@
                 <VerticalStackLayout Spacing="2">
                     <Label Style="{StaticResource PageTitle}" Text="Сегодня" />
                     <Label Style="{StaticResource SecondaryText}" Text="{Binding DateText}" />
+                    <Border
+                        HorizontalOptions="Start"
+                        IsVisible="{Binding HasWeekParity}"
+                        SemanticProperties.Description="{Binding WeekParityText}"
+                        Style="{StaticResource WeekParityBadge}">
+                        <Label Style="{StaticResource WeekParityBadgeText}" Text="{Binding WeekParityText}" />
+                    </Border>
                     <Label Style="{StaticResource SecondaryText}" Text="{Binding GroupText}" />
                 </VerticalStackLayout>
                 <ActivityIndicator Grid.Column="1" IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" />

@@ -161,6 +161,9 @@ public sealed class SchedulePageViewModel : ObservableObject
             }
 
             OnPropertyChanged(nameof(PeriodText));
+            OnPropertyChanged(nameof(WeekParity));
+            OnPropertyChanged(nameof(WeekParityText));
+            OnPropertyChanged(nameof(HasWeekParity));
             OnPropertyChanged(nameof(SelectedDateValue));
             RefreshWeekDates();
             RefreshVisibleLessons();
@@ -259,6 +262,14 @@ public sealed class SchedulePageViewModel : ObservableObject
             return $"{monday:dd.MM}–{monday.AddDays(6):dd.MM.yyyy}";
         }
     }
+
+    public AcademicWeekParity WeekParity => AcademicWeekParityResolver.Resolve(
+        SelectedDate,
+        _referenceCatalog?.Calendar);
+
+    public string WeekParityText => AcademicWeekParityResolver.Format(WeekParity);
+
+    public bool HasWeekParity => WeekParity != AcademicWeekParity.Unknown;
 
     public bool HasTeacherOptions =>
         SelectedTeacher is null &&
@@ -584,6 +595,9 @@ public sealed class SchedulePageViewModel : ObservableObject
         }
 
         _referenceCatalog = await _referenceCatalogProvider.LoadAsync(cancellationToken);
+        OnPropertyChanged(nameof(WeekParity));
+        OnPropertyChanged(nameof(WeekParityText));
+        OnPropertyChanged(nameof(HasWeekParity));
         _teacherReferences.Clear();
         if (_referenceCatalog is null)
         {

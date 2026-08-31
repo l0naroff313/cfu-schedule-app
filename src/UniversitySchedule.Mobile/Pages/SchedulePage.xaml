@@ -221,6 +221,14 @@
                     Text="›" />
             </Grid>
 
+            <Border
+                HorizontalOptions="Center"
+                IsVisible="{Binding HasWeekParity}"
+                SemanticProperties.Description="{Binding WeekParityText}"
+                Style="{StaticResource WeekParityBadge}">
+                <Label Style="{StaticResource WeekParityBadgeText}" Text="{Binding WeekParityText}" />
+            </Border>
+
             <CollectionView
                 HeightRequest="64"
                 HorizontalScrollBarVisibility="Never"
