@@ -19,14 +19,18 @@ internal sealed record VisualSnapshotOptions(string Route, AppTheme Theme)
     public static bool TryRead(out VisualSnapshotOptions options)
     {
         string[] arguments = Environment.GetCommandLineArgs();
-        string? route = ReadValue(arguments, "--visual-snapshot=")?.ToLowerInvariant();
+        string? route = (
+            Environment.GetEnvironmentVariable("VISUAL_SNAPSHOT") ??
+            ReadValue(arguments, "--visual-snapshot="))?.ToLowerInvariant();
         if (route is null || !Routes.Contains(route))
         {
             options = null!;
             return false;
         }
 
-        string? theme = ReadValue(arguments, "--visual-theme=")?.ToLowerInvariant();
+        string? theme = (
+            Environment.GetEnvironmentVariable("VISUAL_THEME") ??
+            ReadValue(arguments, "--visual-theme="))?.ToLowerInvariant();
         options = new VisualSnapshotOptions(
             route,
             theme == "dark" ? AppTheme.Dark : AppTheme.Light);
