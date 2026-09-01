@@ -101,7 +101,7 @@ public sealed class InstallationRegistrationService(
         secret = [];
 
         if (command.InstallationId == Guid.Empty ||
-            platform is not ("android" or "ios") ||
+            platform is not ("android" or "ios" or "web") ||
             string.IsNullOrWhiteSpace(appVersion) ||
             appVersion.Length > MaximumAppVersionLength ||
             appVersion.Any(char.IsControl) ||

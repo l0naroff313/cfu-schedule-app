@@ -42,6 +42,20 @@ public sealed class InstallationRegistrationServiceTests
     }
 
     [Fact]
+    public async Task Register_WebInstallation_IsAccepted()
+    {
+        var repository = new FakeRepository();
+        InstallationRegistrationService service = CreateService(repository);
+
+        InstallationRegistrationResult result = await service.RegisterAsync(
+            CreateCommand(Guid.NewGuid()) with { Platform = " WEB " });
+
+        Assert.Equal(InstallationRegistrationStatus.Success, result.Status);
+        Assert.True(result.IsNewInstallation);
+        Assert.Equal("web", repository.Items[result.InstallationId].Platform);
+    }
+
+    [Fact]
     public async Task Register_DifferentSecretForExistingId_DoesNotIssueToken()
     {
         var repository = new FakeRepository();

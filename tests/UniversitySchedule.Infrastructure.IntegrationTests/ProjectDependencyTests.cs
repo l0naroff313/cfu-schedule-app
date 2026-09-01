@@ -26,6 +26,9 @@ public sealed class ProjectDependencyTests
                 "UniversitySchedule.Contracts",
                 "UniversitySchedule.Domain"),
             ["UniversitySchedule.Mobile"] = Set("UniversitySchedule.Mobile.Core"),
+            ["UniversitySchedule.Web"] = Set(
+                "UniversitySchedule.Contracts",
+                "UniversitySchedule.Mobile.Core"),
         };
 
     [Fact]

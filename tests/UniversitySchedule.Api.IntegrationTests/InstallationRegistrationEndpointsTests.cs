@@ -116,6 +116,23 @@ public sealed class InstallationRegistrationEndpointsTests : IClassFixture<ApiFa
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Register_WebInstallation_ReturnsBearerToken()
+    {
+        using HttpClient client = _factory.CreateClient();
+        var request = new RegisterInstallationRequest(
+            Guid.NewGuid(),
+            Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+            "web",
+            "1.0.0");
+
+        using HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/api/v1/installations/register",
+            request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     private static RegisterInstallationRequest CreateRequest(Guid installationId, byte[] secret)
     {
         return new RegisterInstallationRequest(
