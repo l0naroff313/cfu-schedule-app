@@ -1,0 +1,154 @@
+name: iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - "codex/**"
+    paths:
+      - ".github/workflows/mobile-ios.yml"
+      - "global.json"
+      - "Directory.Build.props"
+      - "src/UniversitySchedule.Contracts/**"
+      - "src/UniversitySchedule.Domain/**"
+      - "src/UniversitySchedule.Mobile.Core/**"
+      - "src/UniversitySchedule.Mobile/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/mobile-ios.yml"
+      - "global.json"
+      - "Directory.Build.props"
+      - "src/UniversitySchedule.Contracts/**"
+      - "src/UniversitySchedule.Domain/**"
+      - "src/UniversitySchedule.Mobile.Core/**"
+      - "src/UniversitySchedule.Mobile/**"
+
+permissions:
+  contents: read
+
+jobs:
+  simulator-build:
+    name: iPhone Simulator Release
+    runs-on: macos-26
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Select Xcode 26.2 with an installed simulator runtime
+        run: sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+
+      - name: Install the .NET MAUI workload
+        run: dotnet workload install maui --skip-manifest-update
+
+      - name: Restore iOS dependencies
+        run: >-
+          dotnet restore
+          src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj
+          -p:RuntimeIdentifier=iossimulator-arm64
+          -p:VisualSnapshots=true
+
+      - name: Build the iPhone Simulator app
+        run: >-
+          dotnet build
+          src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj
+          --configuration Release
+          --framework net10.0-ios
+          --no-restore
+          -p:RuntimeIdentifier=iossimulator-arm64
+          -p:ValidateXcodeVersion=false
+          -p:VisualSnapshots=true
+          -warnaserror
+
+      - name: Upload the simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: CFU-ElJournal-iOS-Simulator
+          path: src/UniversitySchedule.Mobile/bin/Release/net10.0-ios/iossimulator-arm64/UniversitySchedule.Mobile.app
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Capture light and dark iPhone screenshots
+        env:
+          BUNDLE_ID: io.github.l0naroff313.cfuschedule
+        run: |
+          set -euo pipefail
+
+          APP_PATH="$GITHUB_WORKSPACE/src/UniversitySchedule.Mobile/bin/Release/net10.0-ios/iossimulator-arm64/UniversitySchedule.Mobile.app"
+          SCREENSHOT_DIR="$GITHUB_WORKSPACE/artifacts/ios-screenshots"
+          mkdir -p "$SCREENSHOT_DIR"
+
+          RUNTIME_ID=$(python3 -c 'import json, subprocess; data=json.loads(subprocess.check_output(["xcrun", "simctl", "list", "runtimes", "-j"])); print(next(item["identifier"] for item in data["runtimes"] if item["name"] == "iOS 26.2" and item.get("isAvailable", False)))')
+          DEVICE_TYPE_ID=$(python3 -c 'import json, subprocess; data=json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devicetypes", "-j"])); print(next(item["identifier"] for item in data["devicetypes"] if item["name"] == "iPhone 17 Pro"))')
+          DEVICE_UDID=$(xcrun simctl create "CFU Screenshot iPhone" "$DEVICE_TYPE_ID" "$RUNTIME_ID")
+
+          cleanup() {
+            xcrun simctl shutdown "$DEVICE_UDID" >/dev/null 2>&1 || true
+            xcrun simctl delete "$DEVICE_UDID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          xcrun simctl boot "$DEVICE_UDID"
+          xcrun simctl bootstatus "$DEVICE_UDID" -b
+          xcrun simctl spawn "$DEVICE_UDID" defaults write NSGlobalDomain AppleLanguages -array ru
+          xcrun simctl spawn "$DEVICE_UDID" defaults write NSGlobalDomain AppleLocale -string ru_RU
+          xcrun simctl install "$DEVICE_UDID" "$APP_PATH"
+          xcrun simctl status_bar "$DEVICE_UDID" override \
+            --time 08:45 \
+            --batteryState charged \
+            --batteryLevel 100 \
+            --wifiBars 3 \
+            --cellularBars 4
+
+          APP_CONTAINER=$(xcrun simctl get_app_container "$DEVICE_UDID" "$BUNDLE_ID" data)
+          for theme in light dark; do
+            xcrun simctl ui "$DEVICE_UDID" appearance "$theme"
+            for tab in schedule assignments notes profile today; do
+              MARKER="$APP_CONTAINER/Library/Caches/visual-snapshot-ready-$theme-$tab"
+              rm -f "$MARKER"
+              xcrun simctl terminate "$DEVICE_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+              SIMCTL_CHILD_VISUAL_SNAPSHOT="$tab" \
+              SIMCTL_CHILD_VISUAL_THEME="$theme" \
+              xcrun simctl launch "$DEVICE_UDID" "$BUNDLE_ID" \
+                "--visual-snapshot=$tab" \
+                "--visual-theme=$theme"
+
+              ready=false
+              for attempt in $(seq 1 45); do
+                if [[ -f "$MARKER" ]]; then
+                  ready=true
+                  break
+                fi
+                sleep 1
+              done
+              if [[ "$ready" != true ]]; then
+                echo "The app did not become ready for $theme/$tab." >&2
+                xcrun simctl spawn "$DEVICE_UDID" log show \
+                  --last 2m \
+                  --style compact \
+                  --predicate 'process == "UniversitySchedule.Mobile"' | tail -n 200 || true
+                exit 1
+              fi
+
+              sleep 1
+              xcrun simctl io "$DEVICE_UDID" screenshot \
+                "$SCREENSHOT_DIR/$theme-$tab.png"
+            done
+          done
+
+      - name: Upload iPhone screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CFU-ElJournal-iOS-Screenshots
+          path: artifacts/ios-screenshots/*.png
+          if-no-files-found: warn
+          retention-days: 14

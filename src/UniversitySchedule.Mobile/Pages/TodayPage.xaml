@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniversitySchedule.Mobile.Pages.TodayPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewModels="clr-namespace:UniversitySchedule.Mobile.Core.Scheduling;assembly=UniversitySchedule.Mobile.Core"
+    x:DataType="viewModels:TodayPageViewModel"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+    Shell.NavBarIsVisible="False"
+    Title="Сегодня">
+    <ScrollView>
+        <VerticalStackLayout Padding="16,24,16,32" Spacing="14">
+            <Grid ColumnDefinitions="*,Auto">
+                <VerticalStackLayout Spacing="2">
+                    <Label Style="{StaticResource PageTitle}" Text="Сегодня" />
+                    <Label Style="{StaticResource SecondaryText}" Text="{Binding DateText}" />
+                    <Border
+                        HorizontalOptions="Start"
+                        IsVisible="{Binding HasWeekParity}"
+                        SemanticProperties.Description="{Binding WeekParityText}"
+                        Style="{StaticResource WeekParityBadge}">
+                        <Label Style="{StaticResource WeekParityBadgeText}" Text="{Binding WeekParityText}" />
+                    </Border>
+                    <Label Style="{StaticResource SecondaryText}" Text="{Binding GroupText}" />
+                </VerticalStackLayout>
+                <ActivityIndicator Grid.Column="1" IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" />
+            </Grid>
+
+            <VerticalStackLayout IsVisible="{Binding HasCurrentLesson}" Spacing="7">
+                <Label Style="{StaticResource SectionTitle}" Text="Сейчас" />
+                <Border
+                    Padding="16"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}"
+                    BindingContext="{Binding CurrentLesson}"
+                    StrokeThickness="0"
+                    StrokeShape="RoundRectangle 14">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnLessonCardTapped" />
+                    </Border.GestureRecognizers>
+                    <VerticalStackLayout Spacing="7">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label FontFamily="OpenSansSemibold" FontSize="17" Text="{Binding Subject}" TextColor="White" />
+                            <Border Grid.Column="1" Padding="8,4" BackgroundColor="#33FFFFFF" StrokeThickness="0" StrokeShape="RoundRectangle 8">
+                                <Label FontFamily="OpenSansSemibold" Text="{Binding TimeText}" TextColor="White" />
+                            </Border>
+                        </Grid>
+                        <Label Text="{Binding Teachers}" TextColor="#E6FFFFFF" />
+                        <Label Text="{Binding Location}" TextColor="White" />
+                        <Label Text="{Binding Details}" TextColor="#E6FFFFFF" />
+                        <ProgressBar Progress="{Binding Progress}" ProgressColor="{StaticResource Success}" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="{Binding PairText}" TextColor="#E6FFFFFF" />
+                            <Label Grid.Column="1" Text="{Binding ProgressText}" TextColor="#E6FFFFFF" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+
+            <VerticalStackLayout IsVisible="{Binding HasNextLesson}" Spacing="7">
+                <Label Style="{StaticResource SectionTitle}" Text="Следующая пара" />
+                <Border BindingContext="{Binding NextLesson}" Style="{StaticResource Card}">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnLessonCardTapped" />
+                    </Border.GestureRecognizers>
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Border
+                            Padding="10"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 12">
+                            <VerticalStackLayout
+                                HorizontalOptions="Center"
+                                Spacing="1"
+                                VerticalOptions="Center">
+                                <Label HorizontalTextAlignment="Center" Style="{StaticResource SectionTitle}" Text="{Binding PairText}" />
+                                <Label HorizontalTextAlignment="Center" Style="{StaticResource SecondaryText}" Text="{Binding TimeText}" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Style="{StaticResource SectionTitle}" Text="{Binding Subject}" />
+                            <Label Style="{StaticResource SecondaryText}" Text="{Binding Teachers}" />
+                            <Label Text="{Binding Location}" />
+                            <Label Style="{StaticResource SecondaryText}" Text="{Binding ProgressText}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+            </VerticalStackLayout>
+
+            <VerticalStackLayout IsVisible="{Binding HasTodayLessons}" Spacing="7">
+                <Label Style="{StaticResource SectionTitle}" Text="Расписание на сегодня" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding TodayLessons}" Spacing="0">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="viewModels:TodayScheduleRow">
+                                <Grid Padding="0,9" ColumnDefinitions="46,72,*" ColumnSpacing="10">
+                                    <Border
+                                        HeightRequest="38"
+                                        WidthRequest="38"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 10">
+                                        <Label HorizontalTextAlignment="Center" Style="{StaticResource SectionTitle}" Text="{Binding PairText}" VerticalTextAlignment="Center" />
+                                    </Border>
+                                    <Label Grid.Column="1" Style="{StaticResource SecondaryText}" Text="{Binding TimeText}" VerticalTextAlignment="Center" />
+                                    <VerticalStackLayout Grid.Column="2" Spacing="2">
+                                        <Label Style="{StaticResource SectionTitle}" Text="{Binding Subject}" />
+                                        <Label LineBreakMode="TailTruncation" MaxLines="2" Style="{StaticResource SecondaryText}" Text="{Binding Details}" />
+                                    </VerticalStackLayout>
+                                    <Grid.GestureRecognizers>
+                                        <TapGestureRecognizer CommandParameter="{Binding .}" Tapped="OnScheduleRowTapped" />
+                                    </Grid.GestureRecognizers>
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+
+            <VerticalStackLayout IsVisible="{Binding HasTodayAssignments}" Spacing="7">
+                <Label Style="{StaticResource SectionTitle}" Text="Задания" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding TodayAssignments}" Spacing="0">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="viewModels:TodayAssignmentRow">
+                                <Grid Padding="0,9" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                    <Label FontSize="20" Text="▣" TextColor="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                        <Label LineBreakMode="TailTruncation" MaxLines="2" Text="{Binding Text}" />
+                                        <Label Style="{StaticResource SecondaryText}" Text="{Binding Subject}" />
+                                    </VerticalStackLayout>
+                                    <Label Grid.Column="2" Style="{StaticResource SecondaryText}" Text="{Binding DeadlineText}" />
+                                    <Grid.GestureRecognizers>
+                                        <TapGestureRecognizer CommandParameter="{Binding Id}" Tapped="OnAssignmentTapped" />
+                                    </Grid.GestureRecognizers>
+                                </Grid>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+
+            <Label Style="{StaticResource SecondaryText}" Text="{Binding StatusText}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

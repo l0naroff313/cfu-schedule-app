@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniversitySchedule.Mobile.Pages.NotesPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:notes="clr-namespace:UniversitySchedule.Mobile.Core.Notes;assembly=UniversitySchedule.Mobile.Core"
+    x:DataType="notes:NotesPageViewModel"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+    Shell.NavBarIsVisible="False"
+    Title="Заметки">
+    <Grid Padding="16,24,16,32" RowDefinitions="Auto,Auto,*" RowSpacing="14">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+            <Label Style="{StaticResource PageTitle}" Text="Заметки" VerticalOptions="Center" />
+            <Button
+                Grid.Column="1"
+                Clicked="OnAddNoteClicked"
+                SemanticProperties.Description="Добавить заметку"
+                Style="{StaticResource HeaderActionButton}"
+                Text="＋ Новая заметка" />
+        </Grid>
+
+        <Border Grid.Row="1" Padding="0" Style="{StaticResource InputBorder}">
+            <SearchBar
+                Placeholder="Найти в заметках"
+                SemanticProperties.Description="Поиск по заметкам"
+                Text="{Binding Query}" />
+        </Border>
+
+        <Grid Grid.Row="2">
+            <CollectionView
+                x:Name="NotesCollection"
+                IsVisible="{Binding HasNotes}"
+                ItemsSource="{Binding Notes}"
+                SelectionChanged="OnNoteSelectionChanged"
+                SelectionMode="Single">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="notes:NoteListItem">
+                        <VerticalStackLayout Spacing="7">
+                            <Label IsVisible="{Binding ShowSection}" Style="{StaticResource SectionTitle}" Text="{Binding SectionLabel}" />
+                            <SwipeView>
+                            <SwipeView.RightItems>
+                                <SwipeItems Mode="Reveal">
+                                    <SwipeItem
+                                        BackgroundColor="{StaticResource BrandPrimaryLight}"
+                                        CommandParameter="{Binding Id}"
+                                        Invoked="OnPinNoteInvoked"
+                                        Text="{Binding PinText}" />
+                                    <SwipeItem
+                                        BackgroundColor="{StaticResource DangerLight}"
+                                        CommandParameter="{Binding Id}"
+                                        Invoked="OnDeleteNoteInvoked"
+                                        Text="Удалить" />
+                                </SwipeItems>
+                            </SwipeView.RightItems>
+                            <Border Margin="0,0,0,10" Style="{StaticResource Card}">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" RowDefinitions="Auto,Auto,Auto,Auto">
+                                    <Border
+                                        Grid.RowSpan="4"
+                                        Padding="10"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 10"
+                                        VerticalOptions="Start">
+                                        <Label FontSize="20" Text="📝" />
+                                    </Border>
+                                    <Grid Grid.Column="1" ColumnDefinitions="*,Auto">
+                                        <Label Style="{StaticResource SectionTitle}" Text="{Binding Title}" />
+                                        <Label
+                                            Grid.Column="1"
+                                            IsVisible="{Binding IsPinned}"
+                                            SemanticProperties.Description="Закреплённая заметка"
+                                            Text="📌" />
+                                    </Grid>
+                                    <Label
+                                        Grid.Row="1"
+                                        Grid.Column="1"
+                                        TextColor="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}"
+                                        Text="{Binding Subject}" />
+                                    <Label
+                                        Grid.Row="2"
+                                        Grid.Column="1"
+                                        LineBreakMode="TailTruncation"
+                                        MaxLines="3"
+                                        Text="{Binding Preview}" />
+                                    <Label
+                                        Grid.Row="3"
+                                        Grid.Column="1"
+                                        Style="{StaticResource SecondaryText}"
+                                        Text="{Binding UpdatedText}" />
+                                </Grid>
+                            </Border>
+                            </SwipeView>
+                        </VerticalStackLayout>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+            <Border IsVisible="{Binding HasNoNotes}" Style="{StaticResource Card}" VerticalOptions="Start">
+                <VerticalStackLayout Spacing="6">
+                    <Label Style="{StaticResource SectionTitle}" Text="Заметок пока нет" />
+                    <Label Style="{StaticResource SecondaryText}" Text="Нажмите «Новая заметка», выберите пару и сохраните запись для работы без интернета." />
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+    </Grid>
+</ContentPage>

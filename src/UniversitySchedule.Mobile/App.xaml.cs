@@ -1,0 +1,27 @@
+using Microsoft.Extensions.DependencyInjection;
+using UniversitySchedule.Mobile.Services;
+
+namespace UniversitySchedule.Mobile;
+
+public partial class App : Application
+{
+    private readonly AppShell _appShell;
+
+    public App(AppShell appShell, ThemeSettingsService themeSettings)
+    {
+        _appShell = appShell;
+        InitializeComponent();
+        themeSettings.ApplySavedTheme();
+#if VISUAL_SNAPSHOTS
+        if (VisualSnapshotOptions.TryRead(out VisualSnapshotOptions options))
+        {
+            UserAppTheme = options.Theme;
+        }
+#endif
+    }
+
+    protected override Window CreateWindow(IActivationState? activationState)
+    {
+        return new Window(_appShell);
+    }
+}

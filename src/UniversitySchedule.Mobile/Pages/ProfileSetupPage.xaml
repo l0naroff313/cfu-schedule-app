@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniversitySchedule.Mobile.Pages.ProfileSetupPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:profiles="clr-namespace:UniversitySchedule.Mobile.Core.Profiles;assembly=UniversitySchedule.Mobile.Core"
+    x:DataType="profiles:ProfileSetupViewModel"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+    Title="Учебный профиль">
+    <ScrollView>
+        <VerticalStackLayout Padding="20,24,20,36" Spacing="16">
+            <Label Style="{StaticResource PageTitle}" Text="Настройте расписание" />
+            <Label
+                Style="{StaticResource SecondaryText}"
+                Text="Выберите данные из актуального каталога КФУ. Вход и регистрация не нужны." />
+
+            <ActivityIndicator
+                IsRunning="{Binding IsBusy}"
+                IsVisible="{Binding IsBusy}" />
+            <Label Style="{StaticResource SecondaryText}" Text="{Binding StatusText}" />
+            <Border
+                IsVisible="{Binding HasError}"
+                Style="{StaticResource Card}">
+                <Label
+                    Text="{Binding ErrorText}"
+                    TextColor="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}" />
+            </Border>
+
+            <Label Style="{StaticResource SectionTitle}" Text="Институт или факультет" />
+            <Border Style="{StaticResource Card}">
+                <Picker
+                    ItemDisplayBinding="{Binding Name}"
+                    ItemsSource="{Binding Institutes}"
+                    SelectedItem="{Binding SelectedInstitute}"
+                    Title="Выберите подразделение" />
+            </Border>
+
+            <Label Style="{StaticResource SectionTitle}" Text="Направление" />
+            <Border Style="{StaticResource Card}">
+                <Picker
+                    ItemDisplayBinding="{Binding Name}"
+                    ItemsSource="{Binding Directions}"
+                    SelectedItem="{Binding SelectedDirection}"
+                    Title="Выберите направление" />
+            </Border>
+
+            <Label Style="{StaticResource SectionTitle}" Text="Курс" />
+            <Border Style="{StaticResource Card}">
+                <Picker
+                    ItemsSource="{Binding Courses}"
+                    SelectedItem="{Binding SelectedCourse}"
+                    Title="Выберите курс" />
+            </Border>
+
+            <Label Style="{StaticResource SectionTitle}" Text="Группа" />
+            <Border Style="{StaticResource Card}">
+                <Picker
+                    ItemDisplayBinding="{Binding Name}"
+                    ItemsSource="{Binding Groups}"
+                    SelectedItem="{Binding SelectedGroup}"
+                    Title="Выберите номер группы" />
+            </Border>
+
+            <Label Style="{StaticResource SectionTitle}" Text="Подгруппа" />
+            <Border Style="{StaticResource Card}">
+                <Picker
+                    ItemsSource="{Binding Subgroups}"
+                    SelectedItem="{Binding SelectedSubgroup}"
+                    Title="Выберите подгруппу" />
+            </Border>
+
+            <Button
+                Clicked="OnSaveClicked"
+                IsEnabled="{Binding CanSave}"
+                Text="Сохранить и открыть расписание" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

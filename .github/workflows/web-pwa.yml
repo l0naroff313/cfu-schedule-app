@@ -1,0 +1,94 @@
+name: PWA
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+    paths:
+      - ".github/workflows/web-pwa.yml"
+      - "src/UniversitySchedule.Web/**"
+      - "src/UniversitySchedule.Mobile.Core/**"
+      - "src/UniversitySchedule.Contracts/**"
+      - "src/UniversitySchedule.Mobile/Resources/Raw/cfu-reference-catalog.json"
+      - "tests/UniversitySchedule.Mobile.Core.Tests/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/web-pwa.yml"
+      - "src/UniversitySchedule.Web/**"
+      - "src/UniversitySchedule.Mobile.Core/**"
+      - "src/UniversitySchedule.Contracts/**"
+      - "src/UniversitySchedule.Mobile/Resources/Raw/cfu-reference-catalog.json"
+      - "tests/UniversitySchedule.Mobile.Core.Tests/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build PWA
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test shared mobile core
+        run: dotnet test tests/UniversitySchedule.Mobile.Core.Tests/UniversitySchedule.Mobile.Core.Tests.csproj --configuration Release
+
+      - name: Publish PWA
+        run: dotnet publish src/UniversitySchedule.Web/UniversitySchedule.Web.csproj --configuration Release --output artifacts/pwa
+
+      - name: Prepare GitHub Pages base path
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          sed -i 's#<base href="/" />#<base href="/cfu-schedule-app/" />#' artifacts/pwa/wwwroot/index.html
+          cp artifacts/pwa/wwwroot/index.html artifacts/pwa/wwwroot/404.html
+          touch artifacts/pwa/wwwroot/.nojekyll
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CFU-ElJournal-PWA
+          path: artifacts/pwa/wwwroot
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Configure GitHub Pages
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/pwa/wwwroot
+
+  deploy:
+    name: Deploy PWA
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

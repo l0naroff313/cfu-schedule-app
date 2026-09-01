@@ -1,0 +1,31 @@
+@UniversitySchedule.Api_HostAddress = http://localhost:5289
+
+GET {{UniversitySchedule.Api_HostAddress}}/api/v1/system/health
+Accept: application/json
+
+###
+
+GET {{UniversitySchedule.Api_HostAddress}}/health/ready
+Accept: application/json
+
+###
+
+GET {{UniversitySchedule.Api_HostAddress}}/api/v1/catalog/institutes
+Accept: application/json
+
+###
+
+GET {{UniversitySchedule.Api_HostAddress}}/api/v1/catalog/groups/search?query=ПИ-б-о-252
+Accept: application/json
+
+###
+
+GET {{UniversitySchedule.Api_HostAddress}}/api/v1/catalog/teachers/search?query=Иванов
+Accept: application/json
+
+###
+
+GET {{UniversitySchedule.Api_HostAddress}}/api/v1/schedule/groups/00000000-0000-0000-0000-000000000000?subgroup=1
+Accept: application/json
+
+###

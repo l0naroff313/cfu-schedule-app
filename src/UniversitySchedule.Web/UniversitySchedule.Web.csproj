@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UniversitySchedule.Contracts\UniversitySchedule.Contracts.csproj" />
+    <ProjectReference Include="..\UniversitySchedule.Mobile.Core\UniversitySchedule.Mobile.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="wwwroot\data\cfu-reference-catalog.json"
+             Condition="!Exists('wwwroot\data\cfu-reference-catalog.json')"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="wwwroot\data\cfu-reference-catalog.json"
+             Condition="Exists('wwwroot\data\cfu-reference-catalog.json')"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <ServiceWorker Include="wwwroot\service-worker.js"
+                   PublishedContent="wwwroot\service-worker.published.js" />
+  </ItemGroup>
+
+  <Target Name="PrepareWebReferenceCatalog" BeforeTargets="ResolveProjectStaticWebAssets">
+    <MakeDir Directories="wwwroot\data" />
+    <Copy SourceFiles="..\UniversitySchedule.Mobile\Resources\Raw\cfu-reference-catalog.json"
+          DestinationFiles="wwwroot\data\cfu-reference-catalog.json"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

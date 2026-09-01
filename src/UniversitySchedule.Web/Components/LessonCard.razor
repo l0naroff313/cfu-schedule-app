@@ -1,0 +1,78 @@
+<article class="lesson-card @(IsCurrent ? "is-current" : null)">
+    <div class="pair-tile">
+        <strong>@Lesson.PairNumber</strong>
+        <span>пара</span>
+        <small>@TimeRange</small>
+    </div>
+    <div class="lesson-body">
+        @if (ShowDate)
+        {
+            <time class="eyebrow" datetime="@Lesson.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">@DateText</time>
+        }
+        <div class="lesson-title-row">
+            <h3>@Lesson.Subject</h3>
+            @if (!string.IsNullOrWhiteSpace(Lesson.LessonType))
+            {
+                <span class="lesson-type">@Lesson.LessonType</span>
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Teachers))
+        {
+            <p>@Teachers</p>
+        }
+        <p class="lesson-location">@Location</p>
+        @if (!string.IsNullOrWhiteSpace(Groups))
+        {
+            <p class="muted">@Groups</p>
+        }
+        <div class="lesson-actions">
+            <button type="button" class="text-button" @onclick="() => OnAddNote.InvokeAsync(Lesson)">Заметка</button>
+            <button type="button" class="text-button" @onclick="() => OnAddAssignment.InvokeAsync(Lesson)">Задание</button>
+        </div>
+    </div>
+</article>
+
+@code {
+    private static readonly CultureInfo RussianCulture = CultureInfo.GetCultureInfo("ru-RU");
+    private static readonly TimeSpan UniversityOffset = TimeSpan.FromHours(3);
+
+    [Parameter, EditorRequired]
+    public ScheduleLesson Lesson { get; set; } = default!;
+
+    [Parameter]
+    public bool IsCurrent { get; set; }
+
+    [Parameter]
+    public bool ShowDate { get; set; }
+
+    [Parameter]
+    public EventCallback<ScheduleLesson> OnAddNote { get; set; }
+
+    [Parameter]
+    public EventCallback<ScheduleLesson> OnAddAssignment { get; set; }
+
+    private string TimeRange => $"{Lesson.StartsAtUtc.ToOffset(UniversityOffset):HH:mm}–{Lesson.EndsAtUtc.ToOffset(UniversityOffset):HH:mm}";
+
+    private string DateText => Capitalize(Lesson.Date.ToDateTime(TimeOnly.MinValue).ToString("dddd, d MMMM", RussianCulture));
+
+    private string Teachers => string.Join(", ", Lesson.Teachers.Select(teacher => teacher.DisplayName));
+
+    private string Groups => string.Join(", ", Lesson.Groups.Select(group => group.DisplayName));
+
+    private string Location
+    {
+        get
+        {
+            string[] parts = new[] { Lesson.Building, Lesson.Classroom }
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!.Trim())
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .ToArray();
+            return parts.Length == 0 ? "Аудитория не указана" : string.Join(" • ", parts);
+        }
+    }
+
+    private static string Capitalize(string value) => string.IsNullOrEmpty(value)
+        ? value
+        : $"{char.ToUpper(value[0], RussianCulture)}{value[1..]}";
+}

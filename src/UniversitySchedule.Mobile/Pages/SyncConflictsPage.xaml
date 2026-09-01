@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="UniversitySchedule.Mobile.Pages.SyncConflictsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:sync="clr-namespace:UniversitySchedule.Mobile.Core.Sync;assembly=UniversitySchedule.Mobile.Core"
+    x:DataType="sync:SyncConflictsPageViewModel"
+    BackgroundColor="{AppThemeBinding Light={StaticResource PageBackgroundLight}, Dark={StaticResource PageBackgroundDark}}"
+    Shell.NavBarIsVisible="False"
+    Title="Конфликты синхронизации">
+    <Grid Padding="16,20,16,24" RowDefinitions="Auto,Auto,*" RowSpacing="14">
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+            <Button
+                Clicked="OnCloseClicked"
+                SemanticProperties.Description="Закрыть конфликты синхронизации"
+                Style="{StaticResource IconButton}"
+                Text="‹" />
+            <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                <Label Style="{StaticResource PageTitle}" Text="Конфликты" />
+                <Label Style="{StaticResource SecondaryText}" Text="{Binding ConflictCountText}" />
+            </VerticalStackLayout>
+        </Grid>
+
+        <Border
+            Grid.Row="1"
+            IsVisible="{Binding HasStatusMessage}"
+            StrokeThickness="0"
+            StrokeShape="RoundRectangle 12"
+            BackgroundColor="{AppThemeBinding Light={StaticResource SuccessSoftLight}, Dark={StaticResource SuccessSoftDark}}">
+            <Label Text="{Binding StatusMessage}" />
+        </Border>
+
+        <Grid Grid.Row="2">
+            <CollectionView IsVisible="{Binding HasConflicts}" ItemsSource="{Binding Conflicts}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="sync:PersonalDataConflictItem">
+                        <Border Margin="0,0,0,14" Style="{StaticResource Card}">
+                            <VerticalStackLayout Spacing="14">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                    <Border
+                                        Padding="9,5"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 9">
+                                        <Label
+                                            FontFamily="OpenSansSemibold"
+                                            FontSize="12"
+                                            Text="{Binding KindText}"
+                                            TextColor="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}" />
+                                    </Border>
+                                    <Label
+                                        Grid.Column="1"
+                                        LineBreakMode="TailTruncation"
+                                        MaxLines="2"
+                                        Style="{StaticResource SectionTitle}"
+                                        Text="{Binding Title}"
+                                        VerticalOptions="Center" />
+                                </Grid>
+
+                                <Border
+                                    Padding="14"
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}"
+                                    Stroke="{AppThemeBinding Light={StaticResource BrandPrimaryLight}, Dark={StaticResource BrandPrimaryDark}}"
+                                    StrokeShape="RoundRectangle 12">
+                                    <VerticalStackLayout Spacing="6">
+                                        <Label Style="{StaticResource SectionTitle}" Text="На устройстве" />
+                                        <Label LineBreakMode="TailTruncation" MaxLines="5" Text="{Binding LocalSummary}" />
+                                        <Label Style="{StaticResource SecondaryText}" Text="{Binding LocalTimestampText}" />
+                                    </VerticalStackLayout>
+                                </Border>
+
+                                <Border Padding="14" Style="{StaticResource Card}">
+                                    <VerticalStackLayout Spacing="6">
+                                        <Label Style="{StaticResource SectionTitle}" Text="На сервере" />
+                                        <Label LineBreakMode="TailTruncation" MaxLines="5" Text="{Binding ServerSummary}" />
+                                        <Label Style="{StaticResource SecondaryText}" Text="{Binding ServerTimestampText}" />
+                                    </VerticalStackLayout>
+                                </Border>
+
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                    <Button
+                                        Clicked="OnKeepLocalClicked"
+                                        CommandParameter="{Binding MutationId}"
+                                        SemanticProperties.Description="Оставить локальную версию"
+                                        Text="Оставить мою" />
+                                    <Button
+                                        Grid.Column="1"
+                                        Clicked="OnKeepServerClicked"
+                                        CommandParameter="{Binding MutationId}"
+                                        IsEnabled="{Binding CanKeepServer}"
+                                        SemanticProperties.Description="Принять серверную версию"
+                                        Style="{StaticResource DangerButton}"
+                                        Text="Принять серверную" />
+                                </Grid>
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <Border IsVisible="{Binding HasNoConflicts}" Style="{StaticResource Card}" VerticalOptions="Start">
+                <VerticalStackLayout Spacing="8">
+                    <Label FontSize="28" Text="✓" TextColor="{StaticResource Success}" />
+                    <Label Style="{StaticResource SectionTitle}" Text="Конфликтов нет" />
+                    <Label
+                        Style="{StaticResource SecondaryText}"
+                        Text="Локальные заметки и задания согласованы с сервером либо ожидают обычной синхронизации." />
+                </VerticalStackLayout>
+            </Border>
+
+            <ActivityIndicator
+                IsRunning="{Binding IsLoading}"
+                IsVisible="{Binding IsLoading}"
+                VerticalOptions="Center" />
+        </Grid>
+    </Grid>
+</ContentPage>

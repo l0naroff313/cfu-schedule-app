@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f5f7fb" />
+    <meta name="description" content="Расписание КФУ, задания и заметки в устанавливаемом веб-приложении." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="КФУ ЭлЖур" />
+    <base href="/" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/appicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/appicon-180.png" />
+    <title>КФУ ЭлЖур</title>
+    <script>
+        (() => {
+            const saved = localStorage.getItem('cfu.web.theme.v1');
+            const theme = saved === 'light' || saved === 'dark'
+                ? saved
+                : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.dataset.theme = theme;
+        })();
+    </script>
+</head>
+<body>
+    <div id="app">
+        <div class="boot-placeholder"><span></span></div>
+    </div>
+    <div id="blazor-error-ui">
+        Произошла ошибка. <a href="." class="reload">Перезагрузить</a><button type="button" class="dismiss">×</button>
+    </div>
+    <script src="js/browser-services.js"></script>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script>
+        navigator.serviceWorker?.register('service-worker.js', { updateViaCache: 'none' });
+    </script>
+</body>
+</html>

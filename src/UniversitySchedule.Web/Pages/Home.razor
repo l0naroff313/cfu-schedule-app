@@ -1,0 +1,696 @@
+@page "/"
+@implements IDisposable
+@inject WebAppState State
+@inject IJSRuntime JavaScript
+
+<PageTitle>КФУ ЭлЖур</PageTitle>
+
+@if (!State.IsInitialized)
+{
+    <main class="splash-screen" aria-busy="true">
+        <div class="brand-mark" aria-hidden="true">
+            <span></span>
+        </div>
+        <h1>КФУ ЭлЖур</h1>
+        <p>Загружаем расписание…</p>
+        <div class="loading-bar"><span></span></div>
+    </main>
+}
+else
+{
+    <div class="web-app">
+        <main class="app-content">
+            @if (!string.IsNullOrWhiteSpace(State.ErrorText))
+            {
+                <div class="status-banner" role="status">@State.ErrorText</div>
+            }
+
+            @switch (State.ActiveTab)
+            {
+                case WebTab.Today:
+                    @TodayTab
+                    break;
+                case WebTab.Schedule:
+                    @ScheduleTab
+                    break;
+                case WebTab.Assignments:
+                    @AssignmentsTab
+                    break;
+                case WebTab.Notes:
+                    @NotesTab
+                    break;
+                case WebTab.Profile:
+                    @ProfileTab
+                    break;
+            }
+        </main>
+
+        <nav class="bottom-nav" aria-label="Основная навигация">
+            <button class="nav-button @(State.ActiveTab == WebTab.Today ? "active" : null)" type="button" @onclick="() => SelectTabAsync(WebTab.Today)">
+                <AppIcon Name="today" />
+                <span>Сегодня</span>
+            </button>
+            <button class="nav-button @(State.ActiveTab == WebTab.Schedule ? "active" : null)" type="button" @onclick="() => SelectTabAsync(WebTab.Schedule)">
+                <AppIcon Name="schedule" />
+                <span>Расписание</span>
+            </button>
+            <button class="nav-button @(State.ActiveTab == WebTab.Assignments ? "active" : null)" type="button" @onclick="() => SelectTabAsync(WebTab.Assignments)">
+                <AppIcon Name="assignments" />
+                <span>Задания</span>
+            </button>
+            <button class="nav-button @(State.ActiveTab == WebTab.Notes ? "active" : null)" type="button" @onclick="() => SelectTabAsync(WebTab.Notes)">
+                <AppIcon Name="notes" />
+                <span>Заметки</span>
+            </button>
+            <button class="nav-button @(State.ActiveTab == WebTab.Profile ? "active" : null)" type="button" @onclick="() => SelectTabAsync(WebTab.Profile)">
+                <AppIcon Name="profile" />
+                <span>Профиль</span>
+            </button>
+        </nav>
+
+        @if (State.IsBusy)
+        {
+            <div class="busy-indicator" role="status"><span></span><span class="visually-hidden">Загрузка</span></div>
+        }
+    </div>
+
+    @if (State.NeedsProfile)
+    {
+        @ProfileSetup
+    }
+
+    @if (_noteEditorOpen)
+    {
+        @NoteEditor
+    }
+
+    @if (_assignmentEditorOpen)
+    {
+        @AssignmentEditor
+    }
+}
+
+@code {
+    private static readonly CultureInfo RussianCulture = CultureInfo.GetCultureInfo("ru-RU");
+    private static readonly TimeSpan UniversityOffset = TimeSpan.FromHours(3);
+    private string _assignmentFilter = "all";
+    private string _noteFilter = "all";
+    private bool _noteEditorOpen;
+    private Guid? _editingNoteId;
+    private string _noteTitle = string.Empty;
+    private string _noteSubject = string.Empty;
+    private string _noteText = string.Empty;
+    private bool _notePinned;
+    private Guid? _noteLessonId;
+    private bool _assignmentEditorOpen;
+    private Guid? _editingAssignmentId;
+    private string _assignmentSubject = string.Empty;
+    private string _assignmentText = string.Empty;
+    private string _assignmentDeadline = string.Empty;
+    private PersonalAssignmentStatus _assignmentStatus;
+    private Guid? _assignmentLessonId;
+    private string? _editorError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        State.Changed += OnStateChanged;
+        await State.InitializeAsync();
+    }
+
+    private RenderFragment TodayTab => @<section class="tab-page today-page">
+            <header class="page-header">
+                <div>
+                    <h1>Сегодня</h1>
+                    <p>@FullDate(Today)</p>
+                </div>
+                <button class="icon-button" type="button" aria-label="Обновить расписание" @onclick="RefreshScheduleAsync">
+                    <AppIcon Name="refresh" />
+                </button>
+            </header>
+
+            @if (!string.IsNullOrWhiteSpace(TodayParity))
+            {
+                <span class="parity-badge">@TodayParity</span>
+            }
+
+            @if (State.Schedule is null)
+            {
+                @EmptyCard("Расписание ещё не загружено", "Выберите группу или обновите данные при подключении к сети.")
+            }
+            else
+            {
+                <section class="content-section">
+                    <h2>Сейчас</h2>
+                    @if (State.CurrentLesson is { } current)
+                    {
+                        <article class="current-lesson-card">
+                            <div class="current-topline">
+                                <span class="subject-symbol">@SubjectSymbol(current.Subject)</span>
+                                <div>
+                                    <h3>@current.Subject</h3>
+                                    <p>@TeacherNames(current)</p>
+                                </div>
+                                <time>@TimeRange(current)</time>
+                            </div>
+                            <p class="location-line">@Location(current)</p>
+                            <div class="lesson-progress"><span style="width: @(CurrentProgress(current))%"></span></div>
+                            <div class="progress-labels"><span>Идёт @ElapsedText(current)</span><span>Осталось @RemainingText(current)</span></div>
+                        </article>
+                    }
+                    else
+                    {
+                        <div class="card quiet-card">
+                            <strong>Сейчас пары нет</strong>
+                            <span>@(State.NextLesson is null ? "Занятий впереди не найдено." : "Можно подготовиться к следующей паре.")</span>
+                        </div>
+                    }
+                </section>
+
+                @if (State.NextLesson is { } next)
+                {
+                    <section class="content-section">
+                        <h2>Следующая пара</h2>
+                        <article class="next-lesson-card">
+                            <span class="subject-symbol secondary">@SubjectSymbol(next.Subject)</span>
+                            <div>
+                                <h3>@next.Subject</h3>
+                                <p>@TeacherNames(next)</p>
+                                <p>@Location(next)</p>
+                            </div>
+                            <time>@TimeRange(next)</time>
+                        </article>
+                    </section>
+                }
+
+                <section class="content-section">
+                    <h2>Расписание на сегодня</h2>
+                    @if (State.TodayLessons.Count == 0)
+                    {
+                        <div class="card quiet-card"><strong>Занятий нет</strong><span>На этот день расписание пустое.</span></div>
+                    }
+                    else
+                    {
+                        <div class="compact-schedule card">
+                            @foreach (ScheduleLesson lesson in State.TodayLessons)
+                            {
+                                <button class="compact-lesson @(State.IsCurrent(lesson) ? "is-current" : null)" type="button" @onclick="() => OpenNoteEditor(lesson: lesson)">
+                                    <time><strong>@lesson.StartsAtUtc.ToOffset(UniversityOffset).ToString("HH:mm")</strong><span>@lesson.EndsAtUtc.ToOffset(UniversityOffset).ToString("HH:mm")</span></time>
+                                    <span class="compact-dot"></span>
+                                    <span><strong>@lesson.Subject</strong><small>@TeacherNames(lesson) • @Location(lesson)</small></span>
+                                </button>
+                            }
+                        </div>
+                    }
+                </section>
+
+                <section class="content-section">
+                    <div class="section-heading"><h2>Задания</h2><button class="text-button" type="button" @onclick="() => SelectTabAsync(WebTab.Assignments)">Все</button></div>
+                    @foreach (PersonalAssignment assignment in State.Assignments.Where(IsDueSoon).Take(3))
+                    {
+                        @AssignmentRow(assignment)
+                    }
+                    @if (!State.Assignments.Any(IsDueSoon))
+                    {
+                        <div class="card quiet-card"><strong>Срочных заданий нет</strong><span>Новые задания можно добавить в отдельной вкладке.</span></div>
+                    }
+                </section>
+            }
+        </section>;
+
+    private RenderFragment ScheduleTab => @<section class="tab-page schedule-page">
+            <header class="page-header"><div><h1>Расписание</h1><p>@(State.Profile?.GroupName ?? "Учебная группа не выбрана")</p></div></header>
+
+            <div class="segmented-control">
+                <button class="@(!State.IsTeacherMode ? "active" : null)" type="button" @onclick="() => State.SetScheduleAudience(false)">Моя группа</button>
+                <button class="@(State.IsTeacherMode ? "active" : null)" type="button" @onclick="() => State.SetScheduleAudience(true)">Преподаватель</button>
+            </div>
+
+            @if (State.IsTeacherMode)
+            {
+                <section class="teacher-search-panel">
+                    <div class="search-box">
+                        <AppIcon Name="search" Size="20" />
+                        <input aria-label="Фамилия преподавателя" placeholder="Найти преподавателя" @bind="State.TeacherQuery" @bind:event="oninput" @onkeydown="OnTeacherSearchKeyDown" />
+                        <button type="button" @onclick="SearchTeachersAsync">Найти</button>
+                    </div>
+                    <p class="helper-text">@(State.ReferenceCatalog is null ? "Загружается справочник…" : $"{State.ReferenceCatalog.Statistics.TeacherCount} преподавателей • введите фамилию")</p>
+
+                    @if (State.TeacherResults.Count > 0)
+                    {
+                        <div class="teacher-results card">
+                            @foreach (TeacherReference teacher in State.TeacherResults)
+                            {
+                                <button type="button" @onclick="() => State.SelectTeacher(teacher)">
+                                    <span><strong>@teacher.FullName</strong><small>@(teacher.Position ?? "Должность не указана")</small></span>
+                                    <span>›</span>
+                                </button>
+                            }
+                        </div>
+                    }
+
+                    @if (State.SelectedTeacher is { } selectedTeacher)
+                    {
+                        <article class="teacher-profile card">
+                            <div class="teacher-avatar">@Initials(selectedTeacher.FullName)</div>
+                            <div class="teacher-heading"><h2>@selectedTeacher.FullName</h2><p>@(selectedTeacher.Position ?? "Должность не указана")</p></div>
+                            @if (State.CurrentTeacherLesson() is { } currentTeacherLesson)
+                            {
+                                <div class="teacher-now">
+                                    <span>Сейчас преподаёт</span>
+                                    <strong>@currentTeacherLesson.Subject</strong>
+                                    <p>@Location(currentTeacherLesson) • @GroupNames(currentTeacherLesson)</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="teacher-now quiet"><span>Сейчас пары нет</span><p>@(State.TeacherLessons.Count == 0 ? "Расписание КФУ не опубликовано." : "Выберите нужный день недели ниже.")</p></div>
+                            }
+                            <details>
+                                <summary>Преподаваемые дисциплины (@selectedTeacher.Disciplines.Count)</summary>
+                                @if (selectedTeacher.Disciplines.Count == 0)
+                                {
+                                    <p class="muted">Сведения о дисциплинах отсутствуют.</p>
+                                }
+                                else
+                                {
+                                    <ul>@foreach (string discipline in selectedTeacher.Disciplines) { <li>@discipline</li> }</ul>
+                                }
+                            </details>
+                            <details>
+                                <summary>Специальности (@selectedTeacher.Specialties.Count)</summary>
+                                @if (selectedTeacher.Specialties.Count == 0)
+                                {
+                                    <p class="muted">Сведения о специальностях отсутствуют.</p>
+                                }
+                                else
+                                {
+                                    <ul>@foreach (TeacherSpecialtyReference specialty in selectedTeacher.Specialties) { <li><strong>@specialty.Code</strong> — @specialty.Name</li> }</ul>
+                                }
+                            </details>
+                        </article>
+                    }
+                </section>
+            }
+
+            <div class="segmented-control compact">
+                <button class="@(!State.IsWeekMode ? "active" : null)" type="button" @onclick="() => State.SetScheduleRange(false)">День</button>
+                <button class="@(State.IsWeekMode ? "active" : null)" type="button" @onclick="() => State.SetScheduleRange(true)">Неделя</button>
+            </div>
+
+            <div class="date-navigation">
+                <button type="button" aria-label="Предыдущий день" @onclick="() => State.MoveDate(State.IsWeekMode ? -7 : -1)">‹</button>
+                <label>
+                    <span>@PeriodTitle</span>
+                    <input type="date" value="@State.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" @onchange="OnDateChanged" />
+                </label>
+                <button class="today-button" type="button" @onclick="State.GoToday">Сегодня</button>
+                <button type="button" aria-label="Следующий день" @onclick="() => State.MoveDate(State.IsWeekMode ? 7 : 1)">›</button>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(State.WeekParityText))
+            {
+                <div class="parity-row"><span class="parity-badge">@State.WeekParityText</span></div>
+            }
+
+            <div class="week-strip">
+                @foreach (DateOnly date in State.WeekDates)
+                {
+                    <button class="@(date == State.SelectedDate ? "active" : null)" type="button" @onclick="() => State.SelectDate(date)">
+                        <span>@ShortDay(date)</span><strong>@date.Day</strong>
+                    </button>
+                }
+            </div>
+
+            <div class="sync-line"><span class="sync-dot @(State.IsUsingCachedSchedule ? "cached" : null)"></span>@ScheduleSyncText</div>
+
+            <section class="lesson-list">
+                @foreach (ScheduleLesson lesson in State.VisibleLessons)
+                {
+                    <LessonCard @key="lesson.Id" Lesson="lesson" IsCurrent="State.IsCurrent(lesson)" ShowDate="State.IsWeekMode" OnAddNote="lessonItem => OpenNoteEditor(lesson: lessonItem)" OnAddAssignment="lessonItem => OpenAssignmentEditor(lesson: lessonItem)" />
+                }
+                @if (State.VisibleLessons.Count == 0)
+                {
+                    @EmptyCard("Занятий нет", "Для выбранного дня расписание не опубликовано.")
+                }
+            </section>
+        </section>;
+
+    private RenderFragment AssignmentsTab => @<section class="tab-page assignments-page">
+            <header class="page-header">
+                <div><h1>Задания</h1><p>Личные задания к занятиям</p></div>
+                <button class="primary-icon-button" type="button" aria-label="Новое задание" @onclick="() => OpenAssignmentEditor()"><AppIcon Name="plus" /></button>
+            </header>
+
+            <article class="progress-card card">
+                <div><strong>@State.CompletedAssignmentCount из @State.Assignments.Count выполнено</strong><span>@State.AssignmentCompletionPercent%</span></div>
+                <div class="lesson-progress"><span style="width: @State.AssignmentCompletionPercent%"></span></div>
+                <p>Все изменения сохраняются офлайн</p>
+            </article>
+
+            <div class="filter-row">
+                <button class="@(_assignmentFilter == "all" ? "active" : null)" type="button" @onclick='() => _assignmentFilter = "all"'>Все</button>
+                <button class="@(_assignmentFilter == "today" ? "active" : null)" type="button" @onclick='() => _assignmentFilter = "today"'>Сегодня</button>
+                <button class="@(_assignmentFilter == "week" ? "active" : null)" type="button" @onclick='() => _assignmentFilter = "week"'>На неделе</button>
+                <button class="@(_assignmentFilter == "done" ? "active" : null)" type="button" @onclick='() => _assignmentFilter = "done"'>Выполнено</button>
+            </div>
+
+            <section class="personal-list">
+                @foreach (PersonalAssignment assignment in FilteredAssignments)
+                {
+                    <article class="personal-row card @(assignment.Status == PersonalAssignmentStatus.Completed ? "completed" : null)" @key="assignment.Id">
+                        <label class="round-check">
+                            <input type="checkbox" checked="@(assignment.Status == PersonalAssignmentStatus.Completed)" @onchange="() => ToggleAssignmentAsync(assignment)" />
+                            <span></span>
+                        </label>
+                        <div class="subject-symbol small">@SubjectSymbol(assignment.Subject)</div>
+                        <button class="row-main" type="button" @onclick="() => OpenAssignmentEditor(assignment: assignment)">
+                            <strong>@assignment.Text</strong>
+                            <span>@assignment.Subject</span>
+                        </button>
+                        <div class="row-trailing">
+                            <time class="@(IsOverdue(assignment) ? "overdue" : null)">@DeadlineText(assignment)</time>
+                            <button class="mini-icon" type="button" aria-label="Удалить" @onclick="() => DeleteAssignmentAsync(assignment)"><AppIcon Name="trash" Size="17" /></button>
+                        </div>
+                    </article>
+                }
+                @if (FilteredAssignments.Count == 0)
+                {
+                    @EmptyCard("Заданий нет", "Нажмите плюс, чтобы добавить задание и привязать его к паре.")
+                }
+            </section>
+        </section>;
+
+    private RenderFragment NotesTab => @<section class="tab-page notes-page">
+            <header class="page-header">
+                <div><h1>Заметки</h1><p>Личные записи к занятиям</p></div>
+                <button class="new-note-button" type="button" @onclick="() => OpenNoteEditor()"><AppIcon Name="plus" Size="18" /><span>Новая заметка</span></button>
+            </header>
+
+            <div class="filter-row horizontal-scroll">
+                <button class="@(_noteFilter == "all" ? "active" : null)" type="button" @onclick='() => _noteFilter = "all"'>Все</button>
+                <button class="@(_noteFilter == "pinned" ? "active" : null)" type="button" @onclick='() => _noteFilter = "pinned"'>Закреплённые</button>
+                @foreach (string subject in NoteSubjects.Take(4))
+                {
+                    <button class="@(_noteFilter == subject ? "active" : null)" type="button" @onclick="() => _noteFilter = subject">@subject</button>
+                }
+            </div>
+
+            @if (FilteredNotes.Any(note => note.IsPinned))
+            {
+                <h2 class="list-heading">Закреплённые</h2>
+                @foreach (PersonalNote note in FilteredNotes.Where(note => note.IsPinned))
+                {
+                    @NoteCard(note)
+                }
+            }
+
+            @if (FilteredNotes.Any(note => !note.IsPinned))
+            {
+                <h2 class="list-heading">Недавние</h2>
+                @foreach (PersonalNote note in FilteredNotes.Where(note => !note.IsPinned))
+                {
+                    @NoteCard(note)
+                }
+            }
+
+            @if (FilteredNotes.Count == 0)
+            {
+                @EmptyCard("Заметок нет", "Нажмите «Новая заметка» и при желании выберите связанную пару.")
+            }
+        </section>;
+
+    private RenderFragment ProfileTab => @<section class="tab-page profile-page">
+            <header class="page-header">
+                <div><h1>Профиль</h1><p>Без регистрации и аккаунта</p></div>
+                <button class="icon-button" type="button" aria-label="Переключить тему" @onclick="ToggleThemeAsync">
+                    <AppIcon Name="@(State.Theme == "dark" ? "sun" : "moon")" />
+                </button>
+            </header>
+
+            <article class="student-card card">
+                <div class="student-avatar">@GroupInitials</div>
+                <div><h2>Студент КФУ</h2><strong>@(State.Profile?.GroupName ?? "Группа не выбрана")</strong><p>@(State.Profile?.SubgroupName ?? "Без подгруппы") • @(State.Profile?.CourseNumber ?? 0) курс</p><p>@State.Profile?.InstituteName</p></div>
+            </article>
+
+            <article class="profile-stats card">
+                <div><strong>@State.Assignments.Count</strong><span>заданий</span></div>
+                <div><strong>@State.Notes.Count</strong><span>заметок</span></div>
+                <div class="completion-ring" style="--progress: @State.AssignmentCompletionPercent"><strong>@State.AssignmentCompletionPercent%</strong></div>
+            </article>
+
+            <div class="settings-list card">
+                <button type="button" @onclick="async () => await State.OpenProfileEditorAsync()"><span class="settings-symbol">🎓</span><span><strong>Учебный профиль</strong><small>@(State.Profile?.DirectionName ?? "Выберите направление")</small></span><b>›</b></button>
+                <button type="button" @onclick="ToggleThemeAsync"><span class="settings-symbol">@(State.Theme == "dark" ? "☀️" : "🌙")</span><span><strong>Оформление</strong><small>@(State.Theme == "dark" ? "Тёмная тема" : "Светлая тема")</small></span><b>›</b></button>
+                <button type="button" @onclick="async () => await State.SynchronizeAsync()"><span class="settings-symbol">↻</span><span><strong>Синхронизация</strong><small>@State.SyncStatusText</small></span><b>›</b></button>
+                <div class="settings-static"><span class="settings-symbol">#</span><span><strong>Установочный ID</strong><small class="monospace">@State.InstallationId</small></span></div>
+            </div>
+
+            <article class="install-card card">
+                <div class="install-icon"><span></span></div>
+                <div>
+                    <h2>@(State.IsStandalone ? "PWA установлена" : "Установить на iPhone")</h2>
+                    <p>@(State.IsStandalone ? "Приложение запущено с главного экрана." : "Откройте меню «Поделиться» в Safari и выберите «На экран Домой».")</p>
+                </div>
+            </article>
+        </section>;
+
+    private RenderFragment ProfileSetup => @<div class="modal-layer profile-setup-layer" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+            <section class="profile-setup-sheet">
+                <div class="setup-brand"><div class="brand-mark small"><span></span></div><span>КФУ ЭлЖур</span></div>
+                <header>
+                    <div><p>Первый запуск</p><h1 id="profile-title">Выберите учебную группу</h1></div>
+                    @if (State.Profile is not null)
+                    {
+                        <button class="icon-button" type="button" aria-label="Закрыть" @onclick="State.CloseProfileEditor"><AppIcon Name="close" /></button>
+                    }
+                </header>
+                <p class="setup-intro">Регистрация не нужна. Выбор сохранится только на этом устройстве, а расписание будет доступно офлайн.</p>
+
+                @if (State.Catalog is null)
+                {
+                    <div class="setup-loading"><span></span><p>Загружаем институты, направления и группы КФУ…</p></div>
+                    <button class="secondary-button full-width" type="button" @onclick="async () => await State.OpenProfileEditorAsync()">Повторить</button>
+                }
+                else
+                {
+                    <div class="form-grid">
+                        <label><span>Институт или факультет</span><select value="@State.SelectedInstituteId" @onchange="OnInstituteChanged">@foreach (InstituteSummary institute in State.Institutes) { <option value="@institute.Id">@institute.Name</option> }</select></label>
+                        <label><span>Направление</span><select value="@State.SelectedDirectionId" @onchange="OnDirectionChanged">@foreach (DirectionSummary direction in State.Directions) { <option value="@direction.Id">@direction.Name</option> }</select></label>
+                        <div class="split-fields">
+                            <label><span>Курс</span><select value="@State.SelectedCourseNumber" @onchange="OnCourseChanged">@foreach (int course in State.Courses) { <option value="@course">@course курс</option> }</select></label>
+                            <label><span>Подгруппа</span><select value="@State.SelectedSubgroupNumber" @onchange="OnSubgroupChanged"><option value="1">1 подгруппа</option><option value="2">2 подгруппа</option></select></label>
+                        </div>
+                        <label><span>Номер группы</span><select value="@State.SelectedGroupId" @onchange="OnGroupChanged">@foreach (StudyGroupSummary group in State.Groups) { <option value="@group.Id">@group.Name</option> }</select></label>
+                    </div>
+                    <div class="selected-profile-preview"><span>Будет загружено расписание</span><strong>@SelectedGroupText • @State.SelectedSubgroupNumber подгруппа</strong></div>
+                    <button class="primary-button full-width" type="button" disabled="@State.IsBusy" @onclick="SaveProfileAsync">Показать расписание</button>
+                }
+            </section>
+        </div>;
+
+    private RenderFragment NoteEditor => @<div class="modal-layer editor-layer" role="dialog" aria-modal="true" aria-labelledby="note-editor-title" @onclick="CloseNoteEditor">
+            <section class="editor-sheet" @onclick:stopPropagation="true">
+                <header><div><p>@(_editingNoteId is null ? "Новая запись" : "Редактирование")</p><h1 id="note-editor-title">Заметка</h1></div><button class="icon-button" type="button" aria-label="Закрыть" @onclick="CloseNoteEditor"><AppIcon Name="close" /></button></header>
+                <div class="form-grid">
+                    <label><span>Название</span><input maxlength="100" placeholder="Например, формулы к экзамену" @bind="_noteTitle" @bind:event="oninput" /></label>
+                    <label><span>Предмет</span><input maxlength="100" placeholder="Название предмета" @bind="_noteSubject" @bind:event="oninput" /></label>
+                    <label><span>Связанная пара</span><select value="@(_noteLessonId?.ToString() ?? string.Empty)" @onchange="OnNoteLessonChanged"><option value="">Без привязки</option>@foreach (ScheduleLesson lesson in LessonOptions) { <option value="@lesson.Id">@LessonOptionText(lesson)</option> }</select></label>
+                    <label><span>Текст</span><textarea rows="7" placeholder="Введите текст заметки" @bind="_noteText" @bind:event="oninput"></textarea></label>
+                    <label class="toggle-row"><span><strong>Закрепить</strong><small>Показывать заметку первой</small></span><input type="checkbox" @bind="_notePinned" /></label>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_editorError)) { <p class="field-error">@_editorError</p> }
+                <button class="primary-button full-width" type="button" @onclick="SaveNoteAsync">Сохранить заметку</button>
+            </section>
+        </div>;
+
+    private RenderFragment AssignmentEditor => @<div class="modal-layer editor-layer" role="dialog" aria-modal="true" aria-labelledby="assignment-editor-title" @onclick="CloseAssignmentEditor">
+            <section class="editor-sheet" @onclick:stopPropagation="true">
+                <header><div><p>@(_editingAssignmentId is null ? "Новое задание" : "Редактирование")</p><h1 id="assignment-editor-title">Домашнее задание</h1></div><button class="icon-button" type="button" aria-label="Закрыть" @onclick="CloseAssignmentEditor"><AppIcon Name="close" /></button></header>
+                <div class="form-grid">
+                    <label><span>Предмет</span><input maxlength="100" placeholder="Название предмета" @bind="_assignmentSubject" @bind:event="oninput" /></label>
+                    <label><span>Связанная пара</span><select value="@(_assignmentLessonId?.ToString() ?? string.Empty)" @onchange="OnAssignmentLessonChanged"><option value="">Без привязки</option>@foreach (ScheduleLesson lesson in LessonOptions) { <option value="@lesson.Id">@LessonOptionText(lesson)</option> }</select></label>
+                    <label><span>Что нужно сделать</span><textarea rows="5" placeholder="Опишите задание" @bind="_assignmentText" @bind:event="oninput"></textarea></label>
+                    <label><span>Дедлайн</span><input type="datetime-local" value="@_assignmentDeadline" @onchange="eventArgs => _assignmentDeadline = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                    <label><span>Статус</span><select value="@((int)_assignmentStatus)" @onchange="OnAssignmentStatusChanged"><option value="0">Новое</option><option value="1">В работе</option><option value="2">Выполнено</option></select></label>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_editorError)) { <p class="field-error">@_editorError</p> }
+                <button class="primary-button full-width" type="button" @onclick="SaveAssignmentAsync">Сохранить задание</button>
+            </section>
+        </div>;
+
+    private RenderFragment EmptyCard(string Title, string Text) => @<div class="card empty-card"><div class="empty-symbol">○</div><h2>@Title</h2><p>@Text</p></div>;
+
+    private RenderFragment AssignmentRow(PersonalAssignment Assignment) => @<article class="today-assignment card"><div class="subject-symbol small">@SubjectSymbol(Assignment.Subject)</div><button type="button" @onclick="() => OpenAssignmentEditor(assignment: Assignment)"><strong>@Assignment.Text</strong><span>@Assignment.Subject</span></button><time class="@(IsOverdue(Assignment) ? "overdue" : null)">@DeadlineText(Assignment)</time></article>;
+
+    private RenderFragment NoteCard(PersonalNote Note) => @<article class="note-card card" @key="Note.Id">
+            <header><div class="subject-symbol small">@SubjectSymbol(Note.Subject ?? Note.Title ?? "З")</div><div><h3>@(Note.Title ?? "Без названия")</h3><strong>@(Note.Subject ?? LinkedLessonSubject(Note.LessonId) ?? "Личная заметка")</strong></div>@if (Note.IsPinned) { <AppIcon Name="pin" Size="18" /> }</header>
+            <p>@Note.Text</p>
+            <footer><time>Изменено @Note.UpdatedAtUtc.ToLocalTime().ToString("d MMM, HH:mm", RussianCulture)</time><span><button type="button" aria-label="Редактировать" @onclick="() => OpenNoteEditor(note: Note)"><AppIcon Name="edit" Size="17" /></button><button type="button" aria-label="Удалить" @onclick="() => DeleteNoteAsync(Note)"><AppIcon Name="trash" Size="17" /></button></span></footer>
+        </article>;
+
+    private IReadOnlyList<PersonalAssignment> FilteredAssignments => State.Assignments.Where(assignment => _assignmentFilter switch
+    {
+        "today" => assignment.DeadlineUtc?.ToOffset(UniversityOffset).Date == Today.ToDateTime(TimeOnly.MinValue).Date,
+        "week" => assignment.DeadlineUtc is { } deadline && DateOnly.FromDateTime(deadline.ToOffset(UniversityOffset).DateTime) >= StartOfWeek(Today) && DateOnly.FromDateTime(deadline.ToOffset(UniversityOffset).DateTime) <= StartOfWeek(Today).AddDays(6),
+        "done" => assignment.Status == PersonalAssignmentStatus.Completed,
+        _ => true,
+    }).ToArray();
+
+    private IReadOnlyList<PersonalNote> FilteredNotes => State.Notes.Where(note => _noteFilter switch
+    {
+        "pinned" => note.IsPinned,
+        "all" => true,
+        _ => string.Equals(note.Subject, _noteFilter, StringComparison.CurrentCultureIgnoreCase),
+    }).ToArray();
+
+    private IReadOnlyList<string> NoteSubjects => State.Notes.Select(note => note.Subject).Where(subject => !string.IsNullOrWhiteSpace(subject)).Cast<string>().Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(subject => subject, StringComparer.CurrentCultureIgnoreCase).ToArray();
+
+    private IReadOnlyList<ScheduleLesson> LessonOptions => (State.Schedule?.Lessons ?? []).Where(lesson => lesson.Date >= Today.AddDays(-7) && lesson.Date <= Today.AddDays(45)).OrderBy(lesson => lesson.Date).ThenBy(lesson => lesson.PairNumber).Take(80).ToArray();
+
+    private DateOnly Today => DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(UniversityOffset).DateTime);
+
+    private string TodayParity => AcademicWeekParityResolver.Format(AcademicWeekParityResolver.Resolve(Today, State.ReferenceCatalog?.Calendar));
+
+    private string PeriodTitle => State.IsWeekMode ? $"{StartOfWeek(State.SelectedDate):d MMM} — {StartOfWeek(State.SelectedDate).AddDays(6):d MMM}" : FullDate(State.SelectedDate);
+
+    private string ScheduleSyncText => State.Schedule is null ? "Расписание не загружено" : State.IsUsingCachedSchedule ? "Офлайн-копия расписания" : $"Обновлено {State.Schedule.GeneratedAtUtc.ToLocalTime():dd.MM, HH:mm}";
+
+    private string SelectedGroupText => State.Groups.FirstOrDefault(group => group.Id == State.SelectedGroupId)?.Name ?? "Выберите группу";
+
+    private string GroupInitials => string.Concat((State.Profile?.GroupName ?? "КФУ").Where(char.IsLetter).Take(2)).ToUpperInvariant();
+
+    private async Task SelectTabAsync(WebTab tab) => await State.SetTabAsync(tab);
+
+    private async Task RefreshScheduleAsync() => await State.RefreshScheduleAsync();
+
+    private async Task ToggleThemeAsync() => await State.ToggleThemeAsync();
+
+    private async Task SaveProfileAsync()
+    {
+        try { await State.SaveProfileAsync(); }
+        catch (InvalidOperationException exception) { _editorError = exception.Message; }
+    }
+
+    private void OnInstituteChanged(ChangeEventArgs args) { if (Guid.TryParse(args.Value?.ToString(), out Guid value)) State.SelectInstitute(value); }
+    private void OnDirectionChanged(ChangeEventArgs args) { if (Guid.TryParse(args.Value?.ToString(), out Guid value)) State.SelectDirection(value); }
+    private void OnCourseChanged(ChangeEventArgs args) { if (int.TryParse(args.Value?.ToString(), out int value)) State.SelectCourse(value); }
+    private void OnGroupChanged(ChangeEventArgs args) { if (Guid.TryParse(args.Value?.ToString(), out Guid value)) State.SelectGroup(value); }
+    private void OnSubgroupChanged(ChangeEventArgs args) { if (int.TryParse(args.Value?.ToString(), out int value)) State.SelectSubgroup(value); }
+
+    private void OnDateChanged(ChangeEventArgs args)
+    {
+        if (DateOnly.TryParseExact(args.Value?.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly date)) State.SelectDate(date);
+    }
+
+    private async Task OnTeacherSearchKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter") await SearchTeachersAsync();
+    }
+
+    private async Task SearchTeachersAsync() => await State.SearchTeachersAsync();
+
+    private void OpenNoteEditor(ScheduleLesson? lesson = null, PersonalNote? note = null)
+    {
+        _editorError = null;
+        _editingNoteId = note?.Id;
+        _noteTitle = note?.Title ?? (lesson is null ? string.Empty : $"Заметка: {lesson.Subject}");
+        _noteSubject = note?.Subject ?? lesson?.Subject ?? string.Empty;
+        _noteText = note?.Text ?? string.Empty;
+        _notePinned = note?.IsPinned ?? false;
+        _noteLessonId = note?.LessonId ?? lesson?.Id;
+        _noteEditorOpen = true;
+    }
+
+    private void CloseNoteEditor() => _noteEditorOpen = false;
+
+    private async Task SaveNoteAsync()
+    {
+        _editorError = null;
+        if (string.IsNullOrWhiteSpace(_noteText)) { _editorError = "Введите текст заметки."; return; }
+        await State.SaveNoteAsync(_editingNoteId, _noteText, _noteLessonId, _noteTitle, _noteSubject, _notePinned);
+        _noteEditorOpen = false;
+    }
+
+    private async Task DeleteNoteAsync(PersonalNote note)
+    {
+        if (await JavaScript.InvokeAsync<bool>("confirm", $"Удалить заметку «{note.Title ?? "Без названия"}»?")) await State.DeleteNoteAsync(note.Id);
+    }
+
+    private void OnNoteLessonChanged(ChangeEventArgs args)
+    {
+        _noteLessonId = Guid.TryParse(args.Value?.ToString(), out Guid value) ? value : null;
+        ScheduleLesson? lesson = State.FindLesson(_noteLessonId);
+        if (lesson is not null && string.IsNullOrWhiteSpace(_noteSubject)) _noteSubject = lesson.Subject;
+    }
+
+    private void OpenAssignmentEditor(ScheduleLesson? lesson = null, PersonalAssignment? assignment = null)
+    {
+        _editorError = null;
+        _editingAssignmentId = assignment?.Id;
+        _assignmentSubject = assignment?.Subject ?? lesson?.Subject ?? string.Empty;
+        _assignmentText = assignment?.Text ?? string.Empty;
+        _assignmentLessonId = assignment?.LessonId ?? lesson?.Id;
+        _assignmentDeadline = assignment?.DeadlineUtc?.ToOffset(UniversityOffset).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
+        _assignmentStatus = assignment?.Status ?? PersonalAssignmentStatus.New;
+        _assignmentEditorOpen = true;
+    }
+
+    private void CloseAssignmentEditor() => _assignmentEditorOpen = false;
+
+    private async Task SaveAssignmentAsync()
+    {
+        _editorError = null;
+        if (string.IsNullOrWhiteSpace(_assignmentText)) { _editorError = "Введите текст задания."; return; }
+        DateTimeOffset? deadline = ParseDeadline(_assignmentDeadline);
+        await State.SaveAssignmentAsync(_editingAssignmentId, _assignmentSubject, _assignmentText, _assignmentLessonId, deadline, _assignmentStatus);
+        _assignmentEditorOpen = false;
+    }
+
+    private async Task ToggleAssignmentAsync(PersonalAssignment assignment) => await State.SetAssignmentStatusAsync(assignment.Id, assignment.Status == PersonalAssignmentStatus.Completed ? PersonalAssignmentStatus.New : PersonalAssignmentStatus.Completed);
+
+    private async Task DeleteAssignmentAsync(PersonalAssignment assignment)
+    {
+        if (await JavaScript.InvokeAsync<bool>("confirm", $"Удалить задание «{assignment.Text}»?")) await State.DeleteAssignmentAsync(assignment.Id);
+    }
+
+    private void OnAssignmentLessonChanged(ChangeEventArgs args)
+    {
+        _assignmentLessonId = Guid.TryParse(args.Value?.ToString(), out Guid value) ? value : null;
+        ScheduleLesson? lesson = State.FindLesson(_assignmentLessonId);
+        if (lesson is not null && string.IsNullOrWhiteSpace(_assignmentSubject)) _assignmentSubject = lesson.Subject;
+    }
+
+    private void OnAssignmentStatusChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out int value) && Enum.IsDefined(typeof(PersonalAssignmentStatus), value)) _assignmentStatus = (PersonalAssignmentStatus)value;
+    }
+
+    private static DateTimeOffset? ParseDeadline(string value)
+    {
+        if (!DateTime.TryParseExact(value, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime result)) return null;
+        return new DateTimeOffset(DateTime.SpecifyKind(result, DateTimeKind.Unspecified), UniversityOffset).ToUniversalTime();
+    }
+
+    private static bool IsDueSoon(PersonalAssignment assignment) => assignment.Status != PersonalAssignmentStatus.Completed && (assignment.DeadlineUtc is null || assignment.DeadlineUtc <= DateTimeOffset.UtcNow.AddDays(7));
+    private static bool IsOverdue(PersonalAssignment assignment) => assignment.Status != PersonalAssignmentStatus.Completed && assignment.DeadlineUtc < DateTimeOffset.UtcNow;
+    private static string DeadlineText(PersonalAssignment assignment) => assignment.DeadlineUtc is null ? "Без срока" : assignment.DeadlineUtc.Value.ToOffset(UniversityOffset).ToString("d MMM, HH:mm", RussianCulture);
+    private static string FullDate(DateOnly date) => Capitalize(date.ToDateTime(TimeOnly.MinValue).ToString("dddd, d MMMM", RussianCulture));
+    private static string ShortDay(DateOnly date) => date.ToDateTime(TimeOnly.MinValue).ToString("ddd", RussianCulture).TrimEnd('.').ToUpperInvariant();
+    private static string Capitalize(string value) => string.IsNullOrEmpty(value) ? value : $"{char.ToUpper(value[0], RussianCulture)}{value[1..]}";
+    private static string SubjectSymbol(string subject) => string.IsNullOrWhiteSpace(subject) ? "•" : subject.Trim()[0].ToString().ToUpper(RussianCulture);
+    private static string TimeRange(ScheduleLesson lesson) => $"{lesson.StartsAtUtc.ToOffset(UniversityOffset):HH:mm}–{lesson.EndsAtUtc.ToOffset(UniversityOffset):HH:mm}";
+    private static string TeacherNames(ScheduleLesson lesson) => lesson.Teachers.Count == 0 ? "Преподаватель не указан" : string.Join(", ", lesson.Teachers.Select(teacher => teacher.DisplayName));
+    private static string GroupNames(ScheduleLesson lesson) => lesson.Groups.Count == 0 ? "Группа не указана" : string.Join(", ", lesson.Groups.Select(group => group.DisplayName));
+    private static string Location(ScheduleLesson lesson) { string[] parts = new[] { lesson.Building, lesson.Classroom }.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!.Trim()).Distinct(StringComparer.CurrentCultureIgnoreCase).ToArray(); return parts.Length == 0 ? "Аудитория не указана" : string.Join(" • ", parts); }
+    private static int CurrentProgress(ScheduleLesson lesson) { double total = (lesson.EndsAtUtc - lesson.StartsAtUtc).TotalSeconds; double elapsed = (DateTimeOffset.UtcNow - lesson.StartsAtUtc).TotalSeconds; return total <= 0 ? 0 : (int)Math.Clamp(elapsed / total * 100, 0, 100); }
+    private static string ElapsedText(ScheduleLesson lesson) => $"{Math.Max(0, (int)(DateTimeOffset.UtcNow - lesson.StartsAtUtc).TotalMinutes)} мин";
+    private static string RemainingText(ScheduleLesson lesson) => $"{Math.Max(0, (int)Math.Ceiling((lesson.EndsAtUtc - DateTimeOffset.UtcNow).TotalMinutes))} мин";
+    private static string Initials(string fullName) => string.Concat(fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(part => char.ToUpper(part[0], RussianCulture)));
+    private static string LessonOptionText(ScheduleLesson lesson) => $"{lesson.Date:dd.MM} • {lesson.PairNumber} пара • {lesson.Subject}";
+    private string? LinkedLessonSubject(Guid? lessonId) => State.FindLesson(lessonId)?.Subject;
+    private static DateOnly StartOfWeek(DateOnly date) => date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
+
+    private void OnStateChanged(object? sender, EventArgs eventArgs) => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => State.Changed -= OnStateChanged;
+}

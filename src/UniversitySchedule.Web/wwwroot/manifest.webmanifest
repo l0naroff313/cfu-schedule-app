@@ -1,0 +1,28 @@
+{
+  "name": "КФУ ЭлЖур",
+  "short_name": "КФУ ЭлЖур",
+  "description": "Расписание КФУ, задания и заметки",
+  "id": ".",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f5f7fb",
+  "theme_color": "#005aeb",
+  "lang": "ru",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "icons/appicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/appicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+**/bin
+**/obj
+.git
+.git-codex
+.vs
+.idea
+artifacts
+design-references
+Directory.Build.local.props
+.env
