@@ -2,7 +2,7 @@
 
 Мобильное приложение с расписанием и личным электронным дневником для студентов КФУ им. В. И. Вернадского.
 
-Проект разрабатывается на .NET 10: мобильный клиент использует .NET MAUI, SQLite и официальный JSON API КФУ, серверная часть — ASP.NET Core. Вход и регистрация в MVP отсутствуют: при первом запуске пользователь выбирает институт, направление, курс, группу и подгруппу.
+Проект разрабатывается на .NET 10: нативный мобильный клиент использует .NET MAUI и SQLite, дополнительная устанавливаемая PWA — Blazor WebAssembly и IndexedDB, серверная часть — ASP.NET Core. Оба клиента читают официальный JSON API КФУ. Вход и регистрация в MVP отсутствуют: при первом запуске пользователь выбирает институт, направление, курс, группу и подгруппу.
 
 ## Основные разделы
 
@@ -42,7 +42,8 @@ UniversitySchedule.sln
 │   ├── UniversitySchedule.Api
 │   ├── UniversitySchedule.ScheduleImporter
 │   ├── UniversitySchedule.Mobile.Core
-│   └── UniversitySchedule.Mobile
+│   ├── UniversitySchedule.Mobile
+│   └── UniversitySchedule.Web
 ├── tests
 └── docs
 ```
@@ -72,7 +73,8 @@ UniversitySchedule.sln
 - ASP.NET Core API каталога и расписания с точным поиском преподавателя, текущей/следующей парой и проверенным PostgreSQL fallback при недоступности КФУ;
 - PostgreSQL-хранилище установок, личных данных, каталога, журнала публикаций и последних корректных документов официального API КФУ;
 - версионированные API-контракты и health endpoint;
-- unit-тесты доменной, прикладной и мобильной логики.
+- unit-тесты доменной, прикладной и мобильной логики;
+- отдельная Blazor WebAssembly PWA с теми же пятью вкладками, реальным расписанием, IndexedDB-кэшем, офлайн-очередью и установкой на домашний экран iPhone/Android; нативная MAUI-версия сохранена без замены.
 
 ## Локальная сборка
 
@@ -86,6 +88,14 @@ dotnet test UniversitySchedule.sln --no-build --no-restore
 ```
 
 Для Android также нужны Android SDK и JDK 21. Локальные пути можно указать в `Directory.Build.local.props`, скопировав `Directory.Build.local.props.example`; локальный файл исключён из Git.
+
+PWA запускается отдельно и не требует Android SDK, Xcode или Apple Developer:
+
+```powershell
+dotnet run --project src/UniversitySchedule.Web
+```
+
+После публикации на GitHub Pages её можно бесплатно установить на физический iPhone через Safari → «Поделиться» → «На экран Домой». Подробности: [документация PWA](docs/pwa.md).
 
 Пробный универсальный APK без AOT собирается так:
 
@@ -155,6 +165,8 @@ docker compose ps
 Контейнер применяет EF Core-миграции при старте. В production рекомендуется завершать TLS на Caddy/Nginx; мобильный клиент намеренно не отправляет установочный секрет по HTTP.
 
 На Ubuntu те же значения задаются переменными окружения `ConnectionStrings__PostgreSql`, `InstallationAuthentication__SecretPepper` и `InstallationAuthentication__JwtSigningKey`. Секреты не входят в репозиторий.
+
+PWA обращается к API из браузера, поэтому её HTTPS-origin должен присутствовать в `Cors:AllowedOrigins`. Origin GitHub Pages проекта уже добавлен; для другого домена используйте, например, `Cors__AllowedOrigins__0=https://app.example.com`.
 
 Чтобы мобильная сборка отправляла очередь на сервер, укажите доступный с телефона или эмулятора HTTPS-адрес в локальном `Directory.Build.local.props`:
 

@@ -17,6 +17,6 @@ public sealed class UniversityScheduleApiOptions
 
     public bool IsEnabled =>
         BaseAddress is not null &&
-        Platform is "android" or "ios" &&
+        Platform is "android" or "ios" or "web" &&
         !string.IsNullOrWhiteSpace(AppVersion);
 }

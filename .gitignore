@@ -44,4 +44,5 @@ coverage/
 .nuget/
 __pycache__/
 *.py[cod]
+src/UniversitySchedule.Web/wwwroot/data/cfu-reference-catalog.json
 Directory.Build.local.props

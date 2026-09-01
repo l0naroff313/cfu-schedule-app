@@ -23,6 +23,17 @@ builder.Services.AddMemoryCache();
 builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
+string[] corsAllowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+if (corsAllowedOrigins.Length > 0)
+{
+    builder.Services.AddCors(options => options.AddPolicy("Pwa", policy => policy
+        .WithOrigins(corsAllowedOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()));
+}
+
 builder.Services
     .AddOptions<InstallationAuthenticationOptions>()
     .Bind(builder.Configuration.GetSection(InstallationAuthenticationOptions.SectionName))
@@ -106,6 +117,11 @@ if (app.Configuration.GetValue("HttpsRedirection:Enabled", true))
     app.UseHttpsRedirection();
 }
 app.UseResponseCompression();
+if (corsAllowedOrigins.Length > 0)
+{
+    app.UseCors("Pwa");
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
