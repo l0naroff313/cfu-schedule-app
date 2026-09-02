@@ -15,6 +15,7 @@ public partial class AppShell : Shell
     private readonly InstallationIdentityService _installationIdentity;
     private readonly PersonalDataSyncCoordinator _syncCoordinator;
     private readonly ConnectivitySyncService _connectivitySync;
+    private readonly DailyScheduleRefreshService _dailyScheduleRefresh;
     private readonly ILogger<AppShell> _logger;
     private bool _startupChecked;
 
@@ -24,6 +25,7 @@ public partial class AppShell : Shell
         InstallationIdentityService installationIdentity,
         PersonalDataSyncCoordinator syncCoordinator,
         ConnectivitySyncService connectivitySync,
+        DailyScheduleRefreshService dailyScheduleRefresh,
         ILogger<AppShell> logger)
     {
         _services = services;
@@ -31,6 +33,7 @@ public partial class AppShell : Shell
         _installationIdentity = installationIdentity;
         _syncCoordinator = syncCoordinator;
         _connectivitySync = connectivitySync;
+        _dailyScheduleRefresh = dailyScheduleRefresh;
         _logger = logger;
         InitializeComponent();
 
@@ -83,6 +86,7 @@ public partial class AppShell : Shell
         }
 
         await _scheduleSession.InitializeAsync();
+        _dailyScheduleRefresh.Start();
         if (_scheduleSession.Profile is null)
         {
             var setupPage = _services.GetRequiredService<ProfileSetupPage>();

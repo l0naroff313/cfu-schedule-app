@@ -1,0 +1,122 @@
+name: Android
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+    tags:
+      - "v*"
+    paths:
+      - ".github/workflows/mobile-android.yml"
+      - "src/UniversitySchedule.Contracts/**"
+      - "src/UniversitySchedule.Domain/**"
+      - "src/UniversitySchedule.Mobile.Core/**"
+      - "src/UniversitySchedule.Mobile/**"
+      - "Directory.Build.props"
+      - "global.json"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/mobile-android.yml"
+      - "src/UniversitySchedule.Contracts/**"
+      - "src/UniversitySchedule.Domain/**"
+      - "src/UniversitySchedule.Mobile.Core/**"
+      - "src/UniversitySchedule.Mobile/**"
+      - "Directory.Build.props"
+      - "global.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build installable APK
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install .NET MAUI Android workload
+        shell: pwsh
+        run: dotnet workload install maui-android
+
+      - name: Restore Android and shared projects
+        shell: pwsh
+        run: |
+          dotnet restore src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj -p:TargetFramework=net10.0-android
+          dotnet restore src/UniversitySchedule.Mobile.Core/UniversitySchedule.Mobile.Core.csproj
+
+      - name: Publish Android APK
+        shell: pwsh
+        run: >-
+          dotnet publish src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj
+          --configuration Release
+          --framework net10.0-android
+          --no-restore
+          -p:AndroidPackageFormats=apk
+          -p:RunAOTCompilation=false
+          -p:PublishTrimmed=false
+
+      - name: Prepare downloadable APK
+        shell: pwsh
+        run: |
+          $publishDirectory = "src/UniversitySchedule.Mobile/bin/Release/net10.0-android/publish"
+          $apk = Get-ChildItem -Path $publishDirectory -Filter "*-Signed.apk" -File | Select-Object -First 1
+          if ($null -eq $apk) {
+            throw "The signed Android APK was not produced."
+          }
+
+          New-Item -ItemType Directory -Path artifacts/android -Force | Out-Null
+          $target = "artifacts/android/CFU-ElJournal-Android.apk"
+          Copy-Item -LiteralPath $apk.FullName -Destination $target
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $target).Hash.ToLowerInvariant()
+          "$hash  CFU-ElJournal-Android.apk" | Set-Content -Path artifacts/android/CFU-ElJournal-Android.sha256.txt
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CFU-ElJournal-Android
+          path: artifacts/android/*
+          if-no-files-found: error
+          retention-days: 90
+
+  release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: CFU-ElJournal-Android
+          path: release-assets
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${{ github.ref_name }}"
+          release-assets/CFU-ElJournal-Android.apk
+          release-assets/CFU-ElJournal-Android.sha256.txt
+          --verify-tag
+          --title "КФУ ЭлЖур ${{ github.ref_name }}"
+          --notes "Установочный Android APK текущей версии КФУ ЭлЖур. PWA для iPhone доступна через GitHub Pages."

@@ -36,6 +36,7 @@ builder.Services.AddScoped(services => new CfuScheduleRepository(
     services.GetRequiredService<ILocalDataStore>()));
 builder.Services.AddScoped<AcademicProfileStore>();
 builder.Services.AddScoped<ScheduleSession>();
+builder.Services.AddScoped<DailyScheduleRefreshService>();
 builder.Services.AddScoped<InstallationIdentityService>();
 
 Uri? apiBaseAddress = TryGetHttpsUri(builder.Configuration["UniversityScheduleApi:BaseUrl"]);

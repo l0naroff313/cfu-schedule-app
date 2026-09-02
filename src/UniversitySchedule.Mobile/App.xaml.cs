@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using UniversitySchedule.Mobile.Core.Scheduling;
 using UniversitySchedule.Mobile.Services;
 
 namespace UniversitySchedule.Mobile;
@@ -6,10 +8,18 @@ namespace UniversitySchedule.Mobile;
 public partial class App : Application
 {
     private readonly AppShell _appShell;
+    private readonly DailyScheduleRefreshService _dailyScheduleRefresh;
+    private readonly ILogger<App> _logger;
 
-    public App(AppShell appShell, ThemeSettingsService themeSettings)
+    public App(
+        AppShell appShell,
+        ThemeSettingsService themeSettings,
+        DailyScheduleRefreshService dailyScheduleRefresh,
+        ILogger<App> logger)
     {
         _appShell = appShell;
+        _dailyScheduleRefresh = dailyScheduleRefresh;
+        _logger = logger;
         InitializeComponent();
         themeSettings.ApplySavedTheme();
 #if VISUAL_SNAPSHOTS
@@ -22,6 +32,20 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(_appShell);
+        var window = new Window(_appShell);
+        window.Activated += OnWindowActivated;
+        return window;
+    }
+
+    private async void OnWindowActivated(object? sender, EventArgs eventArgs)
+    {
+        try
+        {
+            await _dailyScheduleRefresh.CheckNowAsync();
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        {
+            _logger.LogWarning(exception, "Automatic schedule refresh on activation failed");
+        }
     }
 }

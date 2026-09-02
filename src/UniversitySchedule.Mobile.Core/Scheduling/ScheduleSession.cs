@@ -6,12 +6,14 @@ namespace UniversitySchedule.Mobile.Core.Scheduling;
 
 public sealed class ScheduleSession(
     AcademicProfileStore profileStore,
-    CfuScheduleRepository scheduleRepository)
+    CfuScheduleRepository scheduleRepository,
+    TimeProvider? timeProvider = null)
 {
     private readonly AcademicProfileStore _profileStore = profileStore
         ?? throw new ArgumentNullException(nameof(profileStore));
     private readonly CfuScheduleRepository _scheduleRepository = scheduleRepository
         ?? throw new ArgumentNullException(nameof(scheduleRepository));
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
     private bool _initialized;
 
@@ -22,6 +24,8 @@ public sealed class ScheduleSession(
     public ScheduleSnapshot? Snapshot { get; private set; }
 
     public DateTimeOffset? UpdatedAtUtc { get; private set; }
+
+    public DateTimeOffset? LastNetworkRefreshAtUtc { get; private set; }
 
     public bool IsFromCache { get; private set; }
 
@@ -120,6 +124,10 @@ public sealed class ScheduleSession(
         Snapshot = result.Snapshot;
         UpdatedAtUtc = result.UpdatedAtUtc;
         IsFromCache = result.IsFromCache;
+        if (!result.IsFromCache)
+        {
+            LastNetworkRefreshAtUtc = _timeProvider.GetUtcNow();
+        }
     }
 
     private static int? GetSubgroupNumber(AcademicProfile profile)

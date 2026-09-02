@@ -35,7 +35,8 @@ public sealed class WebAppState(
     PersonalDataSnapshotRestorer snapshotRestorer,
     PersonalDataSyncCoordinator syncCoordinator,
     UniversityScheduleApiOptions apiOptions,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    DailyScheduleRefreshService dailyScheduleRefresh)
 {
     private static readonly TimeSpan UniversityUtcOffset = TimeSpan.FromHours(3);
     private const string DefaultGroupName = "ПИ-б-о-252";
@@ -225,6 +226,8 @@ public sealed class WebAppState(
 
             await RefreshSyncStatusAsync(cancellationToken);
             syncCoordinator.StartBackgroundSynchronization();
+            dailyScheduleRefresh.RefreshAttempted += OnDailyScheduleRefreshAttempted;
+            dailyScheduleRefresh.Start();
             _initialized = true;
         }
         finally
@@ -278,6 +281,22 @@ public sealed class WebAppState(
 
         ApplyProfileSelection();
         NotifyChanged();
+    }
+
+    public async Task RetryCatalogAsync(CancellationToken cancellationToken = default)
+    {
+        IsBusy = true;
+        ErrorText = null;
+        NotifyChanged();
+        try
+        {
+            await LoadCatalogAsync(cancellationToken);
+        }
+        finally
+        {
+            IsBusy = false;
+            NotifyChanged();
+        }
     }
 
     public void CloseProfileEditor()
@@ -566,6 +585,7 @@ public sealed class WebAppState(
         try
         {
             Catalog = (await scheduleRepository.LoadCatalogAsync(cancellationToken)).Catalog;
+            ErrorText = null;
             ApplyProfileSelection();
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
@@ -666,4 +686,6 @@ public sealed class WebAppState(
         date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
 
     private void NotifyChanged() => Changed?.Invoke(this, EventArgs.Empty);
+
+    private void OnDailyScheduleRefreshAttempted(object? sender, EventArgs eventArgs) => NotifyChanged();
 }

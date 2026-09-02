@@ -468,8 +468,19 @@ else
 
                 @if (State.Catalog is null)
                 {
-                    <div class="setup-loading"><span></span><p>Загружаем институты, направления и группы КФУ…</p></div>
-                    <button class="secondary-button full-width" type="button" @onclick="async () => await State.OpenProfileEditorAsync()">Повторить</button>
+                    @if (State.IsBusy)
+                    {
+                        <div class="setup-loading"><span></span><p>Загружаем институты, направления и группы КФУ…</p></div>
+                    }
+                    else
+                    {
+                        <div class="setup-error-banner" role="alert">
+                            <span>@(State.ErrorText ?? "Каталог КФУ пока недоступен. Проверьте интернет и повторите.")</span>
+                            <button class="retry-icon-button" type="button" aria-label="Повторить загрузку каталога" @onclick="async () => await State.RetryCatalogAsync()">
+                                <AppIcon Name="refresh" Size="18" />
+                            </button>
+                        </div>
+                    }
                 }
                 else
                 {

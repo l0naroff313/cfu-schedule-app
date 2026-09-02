@@ -88,6 +88,7 @@ public static class MauiProgram
         });
         builder.Services.AddSingleton<CfuScheduleRepository>();
         builder.Services.AddSingleton<ScheduleSession>();
+        builder.Services.AddSingleton<DailyScheduleRefreshService>();
         builder.Services.AddTransient<ProfileSetupViewModel>();
         builder.Services.AddTransient<TodayPageViewModel>();
         builder.Services.AddTransient<SchedulePageViewModel>();

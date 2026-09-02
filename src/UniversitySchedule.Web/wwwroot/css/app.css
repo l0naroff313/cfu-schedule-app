@@ -325,6 +325,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .setup-intro { color: var(--muted); font-size: 12px; line-height: 1.55; }
 .setup-loading { display: grid; place-items: center; gap: 12px; min-height: 220px; color: var(--muted); text-align: center; font-size: 11px; }
 .setup-loading span { width: 30px; height: 30px; border: 3px solid var(--border); border-top-color: var(--brand); border-radius: 50%; animation: spin .7s linear infinite; }
+.setup-error-banner { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 11px 12px 14px; border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--border)); border-radius: 12px; color: var(--danger); background: color-mix(in srgb, var(--danger-soft) 82%, var(--surface)); font-size: 11px; line-height: 1.45; }
+.retry-icon-button { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid color-mix(in srgb, var(--danger) 18%, var(--border)); border-radius: 9px; color: var(--danger); background: var(--surface-soft); cursor: pointer; }
+.retry-icon-button:active { background: color-mix(in srgb, var(--danger-soft) 68%, var(--surface-soft)); transform: scale(.97); }
 .form-grid { display: grid; gap: 13px; }
 .form-grid label { display: grid; gap: 6px; }
 .form-grid label > span { color: var(--muted); font-size: 10px; font-weight: 650; }
