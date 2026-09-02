@@ -117,6 +117,7 @@ jobs:
           gh release create "${{ github.ref_name }}"
           release-assets/CFU-ElJournal-Android.apk
           release-assets/CFU-ElJournal-Android.sha256.txt
+          --repo "${{ github.repository }}"
           --verify-tag
           --title "КФУ ЭлЖур ${{ github.ref_name }}"
           --notes "Установочный Android APK текущей версии КФУ ЭлЖур. PWA для iPhone доступна через GitHub Pages."
