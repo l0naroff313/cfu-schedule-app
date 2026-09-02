@@ -55,9 +55,11 @@ jobs:
         shell: pwsh
         run: dotnet workload install maui-android
 
-      - name: Restore Android project
+      - name: Restore Android and shared projects
         shell: pwsh
-        run: dotnet restore src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj -p:TargetFramework=net10.0-android
+        run: |
+          dotnet restore src/UniversitySchedule.Mobile/UniversitySchedule.Mobile.csproj -p:TargetFramework=net10.0-android
+          dotnet restore src/UniversitySchedule.Mobile.Core/UniversitySchedule.Mobile.Core.csproj
 
       - name: Publish Android APK
         shell: pwsh
