@@ -43,3 +43,25 @@ Workflow `PWA` проверяет сборку на каждом pull request и
 `https://l0naroff313.github.io/cfu-schedule-app/`
 
 API сервера можно подключить только по HTTPS через `UniversityScheduleApi:BaseUrl` в `wwwroot/appsettings.json`. API уже разрешает origin GitHub Pages из `Cors:AllowedOrigins`; для другого домена добавьте его origin в этот список или через переменную окружения. Без сервера расписание, заметки и задания продолжают работать локально; сервер нужен для синхронизации между устройствами.
+
+## Yandex Cloud Object Storage
+
+Основной публичный адрес можно перенести с `github.io` на отдельный домен в Yandex Cloud. Приложение остаётся статической Blazor WebAssembly PWA: отдельный постоянно работающий сервер для её файлов не нужен.
+
+1. Зарегистрируйте домен или выберите его поддомен, например `app.example.ru`.
+2. В Yandex Cloud создайте публичный Object Storage bucket с именем, которое **полностью совпадает с доменом**, например `app.example.ru`.
+3. В настройках bucket включите «Веб-сайт»: главная страница — `index.html`, страница ошибки — `index.html`. Одинаковая страница нужна для маршрутов одностраничного приложения.
+4. Привяжите домен через DNS и подключите к bucket сертификат из Certificate Manager. PWA и service worker требуют HTTPS.
+5. Создайте отдельный service account для публикации и выдайте ему только необходимый доступ к Object Storage. Создайте статический access key и сразу сохраните обе его части: секрет повторно не показывается.
+6. В `Settings → Secrets and variables → Actions` репозитория добавьте:
+
+   | Тип | Имя | Значение |
+   | --- | --- | --- |
+   | Repository variable | `YANDEX_STORAGE_BUCKET` | Полное имя bucket, например `app.example.ru` |
+   | Repository variable | `PWA_PUBLIC_URL` | Публичный HTTPS-адрес, например `https://app.example.ru/` |
+   | Repository secret | `YANDEX_ACCESS_KEY_ID` | ID статического ключа service account |
+   | Repository secret | `YANDEX_SECRET_ACCESS_KEY` | Секретная часть статического ключа |
+
+После добавления `YANDEX_STORAGE_BUCKET` workflow `PWA` автоматически загрузит root-hosted сборку в Yandex Object Storage при каждом изменении `main`. Секреты не следует отправлять в чат, добавлять в файлы проекта или выводить в журнал сборки.
+
+Если будет подключён ASP.NET Core API для межустройственной синхронизации, добавьте новый origin в `Cors:AllowedOrigins`, например через `Cors__AllowedOrigins__1=https://app.example.ru`. До этого расписание, профиль, заметки и задания продолжат работать локально в PWA.

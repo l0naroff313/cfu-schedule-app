@@ -53,6 +53,13 @@ jobs:
       - name: Publish PWA
         run: dotnet publish src/UniversitySchedule.Web/UniversitySchedule.Web.csproj --configuration Release --output artifacts/pwa
 
+      - name: Prepare root-hosted PWA artifact
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          cp artifacts/pwa/wwwroot/index.html artifacts/pwa/wwwroot/404.html
+          cp -R artifacts/pwa/wwwroot artifacts/pwa-root
+
       - name: Prepare GitHub Pages base path
         if: github.event_name != 'pull_request'
         shell: bash
@@ -65,7 +72,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: CFU-ElJournal-PWA
-          path: artifacts/pwa/wwwroot
+          path: ${{ github.event_name == 'pull_request' && 'artifacts/pwa/wwwroot' || 'artifacts/pwa-root' }}
           if-no-files-found: error
           retention-days: 14
 
@@ -92,3 +99,67 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  deploy-yandex:
+    name: Deploy PWA to Yandex Cloud
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.YANDEX_STORAGE_BUCKET != ''
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: yandex-cloud
+      url: ${{ vars.PWA_PUBLIC_URL }}
+
+    steps:
+      - name: Download root-hosted PWA
+        uses: actions/download-artifact@v4
+        with:
+          name: CFU-ElJournal-PWA
+          path: site
+
+      - name: Validate Yandex Cloud credentials
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YANDEX_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YANDEX_SECRET_ACCESS_KEY }}
+        run: |
+          if [[ -z "$AWS_ACCESS_KEY_ID" || -z "$AWS_SECRET_ACCESS_KEY" ]]; then
+            echo "::error::Add YANDEX_ACCESS_KEY_ID and YANDEX_SECRET_ACCESS_KEY to GitHub Actions secrets."
+            exit 1
+          fi
+
+      - name: Upload versioned PWA assets
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YANDEX_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YANDEX_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ru-central1
+          YANDEX_STORAGE_BUCKET: ${{ vars.YANDEX_STORAGE_BUCKET }}
+        run: >-
+          aws --endpoint-url=https://storage.yandexcloud.net
+          s3 sync site "s3://$YANDEX_STORAGE_BUCKET"
+          --delete
+          --no-progress
+          --cache-control "public,max-age=31536000,immutable"
+          --exclude "index.html"
+          --exclude "404.html"
+          --exclude "manifest.webmanifest"
+          --exclude "service-worker.js"
+          --exclude "service-worker.published.js"
+          --exclude "service-worker-assets.js"
+
+      - name: Upload PWA entry points without persistent caching
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YANDEX_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YANDEX_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ru-central1
+          YANDEX_STORAGE_BUCKET: ${{ vars.YANDEX_STORAGE_BUCKET }}
+        run: |
+          for file in index.html 404.html manifest.webmanifest service-worker.js service-worker.published.js service-worker-assets.js; do
+            if [[ -f "site/$file" ]]; then
+              aws --endpoint-url=https://storage.yandexcloud.net \
+                s3 cp "site/$file" "s3://$YANDEX_STORAGE_BUCKET/$file" \
+                --no-progress \
+                --cache-control "no-cache, no-store, must-revalidate"
+            fi
+          done
