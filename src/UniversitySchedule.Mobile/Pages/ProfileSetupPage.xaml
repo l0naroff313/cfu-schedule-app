@@ -21,9 +21,18 @@
             <Border
                 IsVisible="{Binding HasError}"
                 Style="{StaticResource Card}">
-                <Label
-                    Text="{Binding ErrorText}"
-                    TextColor="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <Label
+                        VerticalTextAlignment="Center"
+                        Text="{Binding ErrorText}"
+                        TextColor="{AppThemeBinding Light={StaticResource DangerLight}, Dark={StaticResource DangerDark}}" />
+                    <Button
+                        Grid.Column="1"
+                        SemanticProperties.Description="Повторить загрузку каталога"
+                        Clicked="OnRetryClicked"
+                        Style="{StaticResource RetryIconButton}"
+                        Text="↻" />
+                </Grid>
             </Border>
 
             <Label Style="{StaticResource SectionTitle}" Text="Институт или факультет" />

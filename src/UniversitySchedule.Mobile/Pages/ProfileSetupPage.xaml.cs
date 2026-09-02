@@ -39,6 +39,12 @@ public partial class ProfileSetupPage : ContentPage
         }
     }
 
+    private async void OnRetryClicked(object? sender, EventArgs e)
+    {
+        CancellationToken cancellationToken = _loadCancellation?.Token ?? CancellationToken.None;
+        await LoadAsync(cancellationToken);
+    }
+
     private async Task LoadAsync(CancellationToken cancellationToken)
     {
         try
