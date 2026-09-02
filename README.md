@@ -196,6 +196,17 @@ dotnet run --project src/UniversitySchedule.ScheduleImporter -- --seed-postgres
 
 Для просмотра расписания сервер по-прежнему не требуется: мобильный клиент читает официальный HTTPS API КФУ и использует SQLite-кэш. ASP.NET Core API и PostgreSQL нужны только для серверной копии и синхронизации личных заметок и заданий.
 
+## Текущая версия приложения
+
+Актуальная публичная версия — **КФУ ЭлЖур v1.0.0**.
+
+| Платформа | Текущая версия | Установка |
+| --- | --- | --- |
+| Android | APK v1.0.0 | [Скачать CFU-ElJournal-Android.apk](https://github.com/l0naroff313/cfu-schedule-app/releases/download/v1.0.0/CFU-ElJournal-Android.apk) |
+| iPhone и iPad | PWA v1.0.0 | [Открыть текущую PWA](https://l0naroff313.github.io/cfu-schedule-app/) |
+
+На Android после загрузки APK может потребоваться разрешить установку приложений из браузера. На iPhone откройте PWA в Safari и выберите **«Поделиться» → «На экран Домой»**. Контрольная сумма Android-сборки опубликована [рядом с APK в GitHub Releases](https://github.com/l0naroff313/cfu-schedule-app/releases/tag/v1.0.0).
+
 ## Дальнейший план
 
 1. Автоматизировать регулярное обновление справочника и отчёта покрытия расписания.
