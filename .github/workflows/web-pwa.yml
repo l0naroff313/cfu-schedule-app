@@ -108,7 +108,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: cloudflare-pages
-      url: ${{ steps.cloudflare.outputs.deployment-url }}
+      url: ${{ steps.cloudflare.outputs.pages-deployment-alias-url }}
 
     steps:
       - name: Download root-hosted PWA
@@ -136,3 +136,11 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy site --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add public PWA address to the run summary
+        shell: bash
+        env:
+          PWA_URL: ${{ steps.cloudflare.outputs.pages-deployment-alias-url }}
+        run: |
+          echo "### Cloudflare PWA" >> "$GITHUB_STEP_SUMMARY"
+          echo "[$PWA_URL]($PWA_URL)" >> "$GITHUB_STEP_SUMMARY"
