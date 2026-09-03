@@ -10,6 +10,8 @@ namespace UniversitySchedule.Mobile;
 
 public partial class AppShell : Shell
 {
+    private static readonly string[] MainTabRoutes = ["today", "schedule", "assignments", "notes", "profile"];
+    private const long MinimumSwipeIntervalMilliseconds = 450;
     private readonly IServiceProvider _services;
     private readonly ScheduleSession _scheduleSession;
     private readonly InstallationIdentityService _installationIdentity;
@@ -18,6 +20,8 @@ public partial class AppShell : Shell
     private readonly DailyScheduleRefreshService _dailyScheduleRefresh;
     private readonly ILogger<AppShell> _logger;
     private bool _startupChecked;
+    private bool _mainTabNavigationPending;
+    private long _lastMainTabSwipeAt;
 
     public AppShell(
         IServiceProvider services,
@@ -98,5 +102,38 @@ public partial class AppShell : Shell
         where TPage : Page
     {
         return new DataTemplate(() => services.GetRequiredService<TPage>());
+    }
+
+    internal async Task NavigateMainTabAsync(int direction)
+    {
+        long now = Environment.TickCount64;
+        if (direction is not (-1 or 1) || _mainTabNavigationPending ||
+            (_lastMainTabSwipeAt != 0 && now - _lastMainTabSwipeAt < MinimumSwipeIntervalMilliseconds) ||
+            Navigation.ModalStack.Count > 0)
+        {
+            return;
+        }
+
+        string location = CurrentState.Location.OriginalString.Trim('/');
+        int currentIndex = Array.FindIndex(
+            MainTabRoutes,
+            route => location.Equals(route, StringComparison.OrdinalIgnoreCase) ||
+                location.StartsWith($"{route}/", StringComparison.OrdinalIgnoreCase));
+        int targetIndex = Math.Clamp(currentIndex + direction, 0, MainTabRoutes.Length - 1);
+        if (currentIndex < 0 || targetIndex == currentIndex)
+        {
+            return;
+        }
+
+        _lastMainTabSwipeAt = now;
+        _mainTabNavigationPending = true;
+        try
+        {
+            await GoToAsync($"//{MainTabRoutes[targetIndex]}", animate: true);
+        }
+        finally
+        {
+            _mainTabNavigationPending = false;
+        }
     }
 }

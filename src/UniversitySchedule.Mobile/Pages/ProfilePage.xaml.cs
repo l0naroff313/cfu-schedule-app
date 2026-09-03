@@ -21,6 +21,7 @@ public partial class ProfilePage : ContentPage
         _scheduleSession = scheduleSession;
         _assignmentStore = assignmentStore;
         InitializeComponent();
+        MainTabSwipeNavigation.Attach(Content);
     }
 
     protected override async void OnAppearing()

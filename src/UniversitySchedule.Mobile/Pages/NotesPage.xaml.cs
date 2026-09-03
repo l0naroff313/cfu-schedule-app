@@ -11,6 +11,7 @@ public partial class NotesPage : ContentPage
     public NotesPage(NotesPageViewModel viewModel, IServiceProvider services)
     {
         InitializeComponent();
+        MainTabSwipeNavigation.Attach(Content);
         _viewModel = viewModel;
         _services = services;
         BindingContext = viewModel;

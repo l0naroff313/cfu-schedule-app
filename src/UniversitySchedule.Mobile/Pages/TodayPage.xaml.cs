@@ -12,6 +12,7 @@ public partial class TodayPage : ContentPage
     public TodayPage(TodayPageViewModel viewModel, IServiceProvider services)
     {
         InitializeComponent();
+        MainTabSwipeNavigation.Attach(Content);
         _viewModel = viewModel;
         _services = services;
         BindingContext = viewModel;

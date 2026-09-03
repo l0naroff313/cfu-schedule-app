@@ -11,6 +11,7 @@ public partial class AssignmentsPage : ContentPage
     public AssignmentsPage(AssignmentsPageViewModel viewModel, IServiceProvider services)
     {
         InitializeComponent();
+        MainTabSwipeNavigation.Attach(Content);
         _viewModel = viewModel;
         _services = services;
         BindingContext = viewModel;

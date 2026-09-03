@@ -13,6 +13,7 @@ public partial class SchedulePage : ContentPage
     public SchedulePage(SchedulePageViewModel viewModel, IServiceProvider services)
     {
         InitializeComponent();
+        MainTabSwipeNavigation.Attach(Content);
         _viewModel = viewModel;
         _services = services;
         BindingContext = viewModel;

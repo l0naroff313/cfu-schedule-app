@@ -53,7 +53,7 @@ UniversitySchedule.sln
 ## Что уже реализовано
 
 - каркас всех проектов и направленные project references;
-- MAUI Shell с пятью согласованными вкладками;
+- MAUI Shell с пятью согласованными вкладками и горизонтальными свайпами между ними;
 - семантические ресурсы светлой и тёмной тем;
 - первый запуск с реальным каталогом институтов, направлений, курсов и групп КФУ;
 - загрузка расписания группы из официального API, разворачивание чётных/нечётных недель и фильтрация подгруппы;
@@ -200,14 +200,16 @@ dotnet run --project src/UniversitySchedule.ScheduleImporter -- --seed-postgres
 
 ## Текущая версия приложения
 
-Актуальная публичная версия — **КФУ ЭлЖур v1.0.0**.
+Актуальная публичная версия — **КФУ ЭлЖур v1.0.1**.
 
 | Платформа | Текущая версия | Установка |
 | --- | --- | --- |
-| Android | APK v1.0.0 | [Скачать CFU-ElJournal-Android.apk](https://github.com/l0naroff313/cfu-schedule-app/releases/download/v1.0.0/CFU-ElJournal-Android.apk) |
-| iPhone и iPad | PWA v1.0.0 | [Открыть текущую PWA](https://l0naroff313.github.io/cfu-schedule-app/) |
+| Android | APK v1.0.1 | [Скачать CFU-ElJournal-Android.apk](https://github.com/l0naroff313/cfu-schedule-app/releases/download/v1.0.1/CFU-ElJournal-Android.apk) |
+| iPhone и iPad | PWA v1.0.1 | [Открыть текущую PWA](https://l0naroff313.github.io/cfu-schedule-app/) |
 
-На Android после загрузки APK может потребоваться разрешить установку приложений из браузера. На iPhone откройте PWA в Safari и выберите **«Поделиться» → «На экран Домой»**. Контрольная сумма Android-сборки опубликована [рядом с APK в GitHub Releases](https://github.com/l0naroff313/cfu-schedule-app/releases/tag/v1.0.0).
+Общие пользовательские функции поддерживаются синхронно в нативном MAUI-клиенте и PWA. Платформенное исключение допускается только для возможности, которой нет на одной из платформ, и явно документируется.
+
+На Android после загрузки APK может потребоваться разрешить установку приложений из браузера. На iPhone откройте PWA в Safari и выберите **«Поделиться» → «На экран Домой»**. Контрольная сумма Android-сборки опубликована [рядом с APK в GitHub Releases](https://github.com/l0naroff313/cfu-schedule-app/releases/tag/v1.0.1).
 
 ## Дальнейший план
 
