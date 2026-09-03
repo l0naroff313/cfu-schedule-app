@@ -96,7 +96,7 @@ PWA запускается отдельно и не требует Android SDK, 
 dotnet run --project src/UniversitySchedule.Web
 ```
 
-После публикации на GitHub Pages её можно бесплатно установить на физический iPhone через Safari → «Поделиться» → «На экран Домой». Подробности: [документация PWA](docs/pwa.md).
+После публикации на Cloudflare Pages или резервном GitHub Pages её можно бесплатно установить на физический iPhone через Safari → «Поделиться» → «На экран Домой». Подробности: [документация PWA](docs/pwa.md).
 
 Пробный универсальный APK без AOT собирается так:
 
@@ -169,9 +169,9 @@ docker compose ps
 
 На Ubuntu те же значения задаются переменными окружения `ConnectionStrings__PostgreSql`, `InstallationAuthentication__SecretPepper` и `InstallationAuthentication__JwtSigningKey`. Секреты не входят в репозиторий.
 
-PWA обращается к API из браузера, поэтому её HTTPS-origin должен присутствовать в `Cors:AllowedOrigins`. Origin GitHub Pages проекта уже добавлен; для другого домена используйте, например, `Cors__AllowedOrigins__0=https://app.example.com`.
+PWA обращается к API из браузера, поэтому её HTTPS-origin должен присутствовать в `Cors:AllowedOrigins`. Origin GitHub Pages проекта уже добавлен; для адреса Cloudflare Pages используйте, например, `Cors__AllowedOrigins__1=https://cfu-eljournal-l0naroff313.pages.dev`.
 
-Workflow также подготовлен для публикации root-hosted PWA в Yandex Cloud Object Storage с отдельным доменом. Настройка bucket, HTTPS и GitHub Actions описана в [`docs/pwa.md`](docs/pwa.md#yandex-cloud-object-storage).
+Workflow также подготовлен для бесплатной публикации root-hosted PWA в Cloudflare Pages без банковской карты и собственного домена. Настройка аккаунта и GitHub Actions описана в [`docs/pwa.md`](docs/pwa.md#cloudflare-pages).
 
 Чтобы мобильная сборка отправляла очередь на сервер, укажите доступный с телефона или эмулятора HTTPS-адрес в локальном `Directory.Build.local.props`:
 

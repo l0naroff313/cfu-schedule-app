@@ -45,24 +45,23 @@ Workflow `PWA` проверяет сборку на каждом pull request и
 
 API сервера можно подключить только по HTTPS через `UniversityScheduleApi:BaseUrl` в `wwwroot/appsettings.json`. API уже разрешает origin GitHub Pages из `Cors:AllowedOrigins`; для другого домена добавьте его origin в этот список или через переменную окружения. Без сервера расписание, заметки и задания продолжают работать локально; сервер нужен для синхронизации между устройствами.
 
-## Yandex Cloud Object Storage
+## Cloudflare Pages
 
-Основной публичный адрес можно перенести с `github.io` на отдельный домен в Yandex Cloud. Приложение остаётся статической Blazor WebAssembly PWA: отдельный постоянно работающий сервер для её файлов не нужен.
+Основной публичный адрес можно перенести с `github.io` на бесплатный HTTPS-адрес вида `https://<project>.pages.dev/`. Приложение остаётся статической Blazor WebAssembly PWA: банковская карта, домен и постоянно работающий сервер для её файлов не нужны. GitHub Actions собирает .NET-проект, а Cloudflare получает только готовые статические файлы.
 
-1. Зарегистрируйте домен или выберите его поддомен, например `app.example.ru`.
-2. В Yandex Cloud создайте публичный Object Storage bucket с именем, которое **полностью совпадает с доменом**, например `app.example.ru`.
-3. В настройках bucket включите «Веб-сайт»: главная страница — `index.html`, страница ошибки — `index.html`. Одинаковая страница нужна для маршрутов одностраничного приложения.
-4. Привяжите домен через DNS и подключите к bucket сертификат из Certificate Manager. PWA и service worker требуют HTTPS.
-5. Создайте отдельный service account для публикации и выдайте ему только необходимый доступ к Object Storage. Создайте статический access key и сразу сохраните обе его части: секрет повторно не показывается.
-6. В `Settings → Secrets and variables → Actions` репозитория добавьте:
+1. Создайте бесплатный аккаунт Cloudflare и откройте `Workers & Pages`.
+2. В профиле Cloudflare откройте `API Tokens → Create Token → Custom token` и выдайте только разрешение `Account → Cloudflare Pages → Edit` для своего аккаунта.
+3. Скопируйте `Account ID` из обзорной страницы Cloudflare. API-токен показывается один раз; не отправляйте его в чат и не сохраняйте в проекте.
+4. В `Settings → Secrets and variables → Actions` репозитория добавьте:
 
    | Тип | Имя | Значение |
    | --- | --- | --- |
-   | Repository variable | `YANDEX_STORAGE_BUCKET` | Полное имя bucket, например `app.example.ru` |
-   | Repository variable | `PWA_PUBLIC_URL` | Публичный HTTPS-адрес, например `https://app.example.ru/` |
-   | Repository secret | `YANDEX_ACCESS_KEY_ID` | ID статического ключа service account |
-   | Repository secret | `YANDEX_SECRET_ACCESS_KEY` | Секретная часть статического ключа |
+   | Repository variable | `CLOUDFLARE_PAGES_PROJECT` | Уникальное имя, например `cfu-eljournal-l0naroff313` |
+   | Repository secret | `CLOUDFLARE_ACCOUNT_ID` | Идентификатор аккаунта Cloudflare |
+   | Repository secret | `CLOUDFLARE_API_TOKEN` | Созданный API-токен |
 
-После добавления `YANDEX_STORAGE_BUCKET` workflow `PWA` автоматически загрузит root-hosted сборку в Yandex Object Storage при каждом изменении `main`. Секреты не следует отправлять в чат, добавлять в файлы проекта или выводить в журнал сборки.
+5. Откройте `Actions → PWA → Run workflow`. Первая публикация создаст Direct Upload project, последующие изменения `main` будут публиковаться автоматически.
 
-Если будет подключён ASP.NET Core API для межустройственной синхронизации, добавьте новый origin в `Cors:AllowedOrigins`, например через `Cors__AllowedOrigins__1=https://app.example.ru`. До этого расписание, профиль, заметки и задания продолжат работать локально в PWA.
+Cloudflare Pages распознаёт сборку без верхнеуровневого `404.html` как одностраничное приложение и направляет неизвестные маршруты в корень. GitHub Pages получает отдельную сборку с `404.html` и остаётся резервным адресом.
+
+Если будет подключён ASP.NET Core API для межустройственной синхронизации, добавьте новый origin в `Cors:AllowedOrigins`, например через `Cors__AllowedOrigins__1=https://cfu-eljournal-l0naroff313.pages.dev`. До этого расписание, профиль, заметки и задания продолжат работать локально в PWA.
