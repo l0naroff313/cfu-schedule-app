@@ -66,11 +66,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     min-height: 100dvh;
     margin: 0 auto;
     padding: calc(18px + var(--safe-top)) 16px calc(106px + var(--safe-bottom));
+    touch-action: pan-y;
+    overscroll-behavior-x: contain;
 }
 
 .tab-page { display: grid; gap: 16px; animation: page-in .18s ease-out; }
+.tab-transition-forward .tab-page { animation-name: page-in-from-right; }
+.tab-transition-backward .tab-page { animation-name: page-in-from-left; }
 
 @keyframes page-in { from { opacity: .35; transform: translateY(5px); } }
+@keyframes page-in-from-right { from { opacity: .35; transform: translateX(20px); } }
+@keyframes page-in-from-left { from { opacity: .35; transform: translateX(-20px); } }
 
 .page-header { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .page-header h1 { font-size: 25px; line-height: 1.15; letter-spacing: -.45px; }

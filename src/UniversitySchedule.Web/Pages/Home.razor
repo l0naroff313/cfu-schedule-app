@@ -1,5 +1,5 @@
 @page "/"
-@implements IDisposable
+@implements IAsyncDisposable
 @inject WebAppState State
 @inject IJSRuntime JavaScript
 
@@ -19,7 +19,7 @@
 else
 {
     <div class="web-app">
-        <main class="app-content">
+        <main class="app-content @TabTransitionClass" @ref="_swipeSurface">
             @if (!string.IsNullOrWhiteSpace(State.ErrorText))
             {
                 <div class="status-banner" role="status">@State.ErrorText</div>
@@ -93,6 +93,13 @@ else
 @code {
     private static readonly CultureInfo RussianCulture = CultureInfo.GetCultureInfo("ru-RU");
     private static readonly TimeSpan UniversityOffset = TimeSpan.FromHours(3);
+    private static readonly WebTab[] Tabs = [WebTab.Today, WebTab.Schedule, WebTab.Assignments, WebTab.Notes, WebTab.Profile];
+    private ElementReference _swipeSurface;
+    private DotNetObjectReference<Home>? _dotNetReference;
+    private int? _swipeRegistrationId;
+    private bool _isSwipeAttachmentPending;
+    private bool _isDisposed;
+    private int _tabTransitionDirection;
     private string _assignmentFilter = "all";
     private string _noteFilter = "all";
     private bool _noteEditorOpen;
@@ -115,6 +122,33 @@ else
     {
         State.Changed += OnStateChanged;
         await State.InitializeAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!State.IsInitialized || _swipeRegistrationId is not null || _isSwipeAttachmentPending || _isDisposed)
+        {
+            return;
+        }
+
+        _isSwipeAttachmentPending = true;
+        try
+        {
+            _dotNetReference ??= DotNetObjectReference.Create(this);
+            int registrationId = await JavaScript.InvokeAsync<int>("cfuSwipe.attach", _swipeSurface, _dotNetReference);
+            if (_isDisposed)
+            {
+                await JavaScript.InvokeVoidAsync("cfuSwipe.detach", registrationId);
+            }
+            else
+            {
+                _swipeRegistrationId = registrationId;
+            }
+        }
+        finally
+        {
+            _isSwipeAttachmentPending = false;
+        }
     }
 
     private RenderFragment TodayTab => @<section class="tab-page today-page">
@@ -570,7 +604,36 @@ else
 
     private string GroupInitials => string.Concat((State.Profile?.GroupName ?? "КФУ").Where(char.IsLetter).Take(2)).ToUpperInvariant();
 
-    private async Task SelectTabAsync(WebTab tab) => await State.SetTabAsync(tab);
+    private string? TabTransitionClass => _tabTransitionDirection switch
+    {
+        > 0 => "tab-transition-forward",
+        < 0 => "tab-transition-backward",
+        _ => null,
+    };
+
+    private async Task SelectTabAsync(WebTab tab)
+    {
+        int currentIndex = Array.IndexOf(Tabs, State.ActiveTab);
+        int targetIndex = Array.IndexOf(Tabs, tab);
+        _tabTransitionDirection = Math.Sign(targetIndex - currentIndex);
+        await State.SetTabAsync(tab);
+    }
+
+    [JSInvokable]
+    public async Task OnTabSwipe(int direction)
+    {
+        if (direction is not (-1 or 1) || State.NeedsProfile || State.IsBusy || _noteEditorOpen || _assignmentEditorOpen)
+        {
+            return;
+        }
+
+        int currentIndex = Array.IndexOf(Tabs, State.ActiveTab);
+        int targetIndex = Math.Clamp(currentIndex + direction, 0, Tabs.Length - 1);
+        if (targetIndex != currentIndex)
+        {
+            await SelectTabAsync(Tabs[targetIndex]);
+        }
+    }
 
     private async Task RefreshScheduleAsync() => await State.RefreshScheduleAsync();
 
@@ -703,5 +766,22 @@ else
 
     private void OnStateChanged(object? sender, EventArgs eventArgs) => _ = InvokeAsync(StateHasChanged);
 
-    public void Dispose() => State.Changed -= OnStateChanged;
+    public async ValueTask DisposeAsync()
+    {
+        _isDisposed = true;
+        State.Changed -= OnStateChanged;
+        if (_swipeRegistrationId is int registrationId)
+        {
+            try
+            {
+                await JavaScript.InvokeVoidAsync("cfuSwipe.detach", registrationId);
+            }
+            catch (JSException)
+            {
+                // The browser runtime may already be gone during page teardown.
+            }
+        }
+
+        _dotNetReference?.Dispose();
+    }
 }
