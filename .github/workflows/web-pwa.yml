@@ -132,6 +132,52 @@ jobs:
             exit 1
           fi
 
+      - name: Ensure Cloudflare Pages project exists
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLAREACCOUNTID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.SECRET }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects"
+          status=$(curl --silent --show-error \
+            --output cloudflare-project.json \
+            --write-out "%{http_code}" \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "$api/$CLOUDFLARE_PAGES_PROJECT")
+
+          if [[ "$status" == "200" ]]; then
+            echo "Cloudflare Pages project already exists."
+            exit 0
+          fi
+
+          if [[ "$status" != "404" ]]; then
+            message=$(jq -r '[.errors[]?.message] | join("; ")' cloudflare-project.json)
+            echo "::error::Cloudflare project lookup failed (HTTP $status): $message"
+            exit 1
+          fi
+
+          payload=$(jq -n \
+            --arg name "$CLOUDFLARE_PAGES_PROJECT" \
+            '{name: $name, production_branch: "main"}')
+          status=$(curl --silent --show-error \
+            --output cloudflare-project.json \
+            --write-out "%{http_code}" \
+            --request POST \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data "$payload" \
+            "$api")
+
+          if [[ "$status" != "200" && "$status" != "201" ]]; then
+            message=$(jq -r '[.errors[]?.message] | join("; ")' cloudflare-project.json)
+            echo "::error::Cloudflare project creation failed (HTTP $status): $message"
+            exit 1
+          fi
+
+          echo "Cloudflare Pages project created."
+
       - name: Deploy to Cloudflare Pages
         id: cloudflare
         uses: cloudflare/wrangler-action@v3
