@@ -57,7 +57,7 @@ API сервера можно подключить только по HTTPS че�
    | Тип | Имя | Значение |
    | --- | --- | --- |
    | Repository variable | `CLOUDFLARE_PAGES_PROJECT` | Уникальное имя, например `cfu-eljournal-l0naroff313` |
-   | Repository secret | `CLOUDFLARE_ACCOUNT_ID` | Идентификатор аккаунта Cloudflare |
+   | Repository variable | `CLOUDFLARE_ACCOUNT_ID` | Идентификатор аккаунта Cloudflare |
    | Repository secret | `CLOUDFLARE_API_TOKEN` | Созданный API-токен |
 
 5. Откройте `Actions → PWA → Run workflow`. Первая публикация создаст Direct Upload project, последующие изменения `main` будут публиковаться автоматически.
