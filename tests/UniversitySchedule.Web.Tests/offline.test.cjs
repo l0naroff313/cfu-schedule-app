@@ -85,7 +85,10 @@ async function ensureControlled(page) {
 
 for (const [browserName, browserType] of [['chromium', chromium], ['webkit', webkit]]) {
     for (const basePath of ['/', '/cfu-schedule-app/']) {
-        test(`${browserName}: ${basePath} offline cold launch, cache repair and personal data`, { timeout: 180000 }, async t => {
+        const testOptions = browserName === 'webkit'
+            ? { timeout: 180000, skip: 'Playwright WebKit cannot reliably activate service workers; verify the cold launch in iOS Safari.' }
+            : { timeout: 180000 };
+        test(`${browserName}: ${basePath} offline cold launch, cache repair and personal data`, testOptions, async t => {
             const root = fs.mkdtempSync(path.join(artifacts, `${browserName}-`));
             const site = path.join(root, 'site');
             fs.cpSync(published, site, { recursive: true });
@@ -105,23 +108,9 @@ for (const [browserName, browserType] of [['chromium', chromium], ['webkit', web
             let page = await context.newPage();
             page.on('pageerror', error => t.diagnostic(error.message));
             await page.goto(server.url);
-            if (browserName === 'webkit' && !(await page.evaluate(() => 'serviceWorker' in navigator))) {
-                t.skip('Playwright WebKit does not expose service workers; verify this flow in Safari on iOS.');
-                await page.close();
-                return;
-            }
             await page.getByRole('button', { name: 'Показать расписание', exact: true }).click();
             await page.locator('.profile-setup-layer').waitFor({ state: 'hidden' });
-            try {
-                await ensureControlled(page);
-            } catch (error) {
-                if (browserName === 'webkit') {
-                    t.skip(`Playwright WebKit could not activate a service worker: ${error.message}`);
-                    await page.close();
-                    return;
-                }
-                throw error;
-            }
+            await ensureControlled(page);
             await page.getByRole('navigation').getByRole('button', { name: 'Профиль', exact: true }).click();
             await page.locator('.offline-card button').click();
             await page.locator('.offline-card.ready').filter({ hasText: 'Готово' }).waitFor();
