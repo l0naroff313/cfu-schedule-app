@@ -12,6 +12,8 @@ on:
       - "src/UniversitySchedule.Contracts/**"
       - "src/UniversitySchedule.Mobile/Resources/Raw/cfu-reference-catalog.json"
       - "tests/UniversitySchedule.Mobile.Core.Tests/**"
+      - "tests/UniversitySchedule.Web.Tests/**"
+      - "tools/prepare-pwa-base.cjs"
   pull_request:
     branches:
       - main
@@ -22,6 +24,8 @@ on:
       - "src/UniversitySchedule.Contracts/**"
       - "src/UniversitySchedule.Mobile/Resources/Raw/cfu-reference-catalog.json"
       - "tests/UniversitySchedule.Mobile.Core.Tests/**"
+      - "tests/UniversitySchedule.Web.Tests/**"
+      - "tools/prepare-pwa-base.cjs"
   workflow_dispatch:
 
 permissions:
@@ -54,6 +58,29 @@ jobs:
       - name: Publish PWA
         run: dotnet publish src/UniversitySchedule.Web/UniversitySchedule.Web.csproj --configuration Release --output artifacts/pwa
 
+      - name: Set up browser tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install browser test dependencies
+        working-directory: tests/UniversitySchedule.Web.Tests
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium webkit
+
+      - name: Test offline startup in Chromium and WebKit
+        working-directory: tests/UniversitySchedule.Web.Tests
+        run: npm test
+
+      - name: Upload offline test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PWA-Offline-Tests
+          path: artifacts/offline-tests/*.png
+          if-no-files-found: ignore
+
       - name: Prepare root-hosted PWA artifact
         if: github.event_name != 'pull_request'
         shell: bash
@@ -65,9 +92,7 @@ jobs:
         if: github.event_name != 'pull_request'
         shell: bash
         run: |
-          sed -i 's#<base href="/" />#<base href="/cfu-schedule-app/" />#' artifacts/pwa/wwwroot/index.html
-          cp artifacts/pwa/wwwroot/index.html artifacts/pwa/wwwroot/404.html
-          touch artifacts/pwa/wwwroot/.nojekyll
+          node tools/prepare-pwa-base.cjs artifacts/pwa/wwwroot /cfu-schedule-app/
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

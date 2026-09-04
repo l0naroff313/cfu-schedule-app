@@ -253,6 +253,11 @@ public sealed class WebAppState(
     {
         ActiveTab = tab;
         NotifyChanged();
+        if (tab == WebTab.Profile)
+        {
+            await RefreshOfflineReadinessAsync(cancellationToken);
+            NotifyChanged();
+        }
         if (tab == WebTab.Schedule && ReferenceCatalog is null)
         {
             await EnsureReferenceCatalogAsync(cancellationToken);
@@ -590,6 +595,7 @@ public sealed class WebAppState(
         }
 
         IsPreparingOffline = true;
+        IsOfflineReady = false;
         IsBusy = true;
         ErrorText = null;
         OfflineStatusText = "Сохраняем расписание и файлы приложения…";
@@ -762,7 +768,7 @@ public sealed class WebAppState(
                 ? "Расписание выбранной группы ещё не сохранено"
                 : !shell.IsSupported
                     ? "Браузер не поддерживает автономную установку"
-                    : "Расписание сохранено, файлы приложения ещё не готовы";
+                    : shell.Error ?? "Расписание сохранено, файлы приложения ещё не готовы";
     }
 
     private static string SearchableTeacherText(TeacherReference teacher) => NormalizeSearch(

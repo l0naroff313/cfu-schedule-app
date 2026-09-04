@@ -43,6 +43,7 @@ coverage/
 .dotnet/
 .nuget/
 __pycache__/
+node_modules/
 *.py[cod]
 src/UniversitySchedule.Web/wwwroot/data/cfu-reference-catalog.json
 Directory.Build.local.props

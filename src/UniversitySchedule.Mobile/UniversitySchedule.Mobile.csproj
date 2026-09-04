@@ -25,8 +25,8 @@
 		<ApplicationId>io.github.l0naroff313.cfuschedule</ApplicationId>
 
 		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0.2</ApplicationDisplayVersion>
-		<ApplicationVersion>3</ApplicationVersion>
+		<ApplicationDisplayVersion>1.0.3</ApplicationDisplayVersion>
+		<ApplicationVersion>4</ApplicationVersion>
 
 		<!-- Set this in Directory.Build.local.props to enable HTTPS sync with the ASP.NET Core API. -->
 		<UniversityScheduleApiBaseUrl Condition="'$(UniversityScheduleApiBaseUrl)' == ''"></UniversityScheduleApiBaseUrl>

@@ -34,10 +34,12 @@
     async function write(storeName, value, key) {
         const database = await openDatabase();
         return new Promise((resolve, reject) => {
-            const store = database.transaction(storeName, 'readwrite').objectStore(storeName);
-            const request = key === undefined ? store.put(value) : store.put(value, key);
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
+            const transaction = database.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+            if (key === undefined) store.put(value); else store.put(value, key);
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+            transaction.onabort = () => reject(transaction.error ?? new Error('Запись данных отменена.'));
         });
     }
 
@@ -82,49 +84,43 @@
         };
     }
 
-    async function inspectOfflineCache() {
+    async function requestOfflineWorker(type) {
         if (!('serviceWorker' in navigator) || !('caches' in window)) {
             return emptyOfflineStatus('Автономный режим не поддерживается этим браузером.');
         }
 
-        const names = (await caches.keys()).filter(name => name.startsWith('cfu-eljournal-cache-'));
-        if (names.length === 0) return emptyOfflineStatus();
-
-        let cachedAssetCount = 0;
-        for (const name of names) {
-            const cache = await caches.open(name);
-            cachedAssetCount += (await cache.keys()).length;
+        const registration = await navigator.serviceWorker.getRegistration(document.baseURI);
+        const worker = navigator.serviceWorker.controller;
+        if (!registration?.active || !worker || worker.state !== 'activated') {
+            return emptyOfflineStatus('Файлы приложения ещё устанавливаются. Откройте приложение повторно с интернетом.');
         }
-
-        const indexUrl = new URL('index.html', document.baseURI).href;
-        const hasAppShell = await caches.match(indexUrl) !== undefined;
-        return {
-            isSupported: true,
-            isReady: hasAppShell && cachedAssetCount > 0,
-            cachedAssetCount,
-            missingAssetCount: 0,
-            error: null
-        };
-    }
-
-    async function requestOfflineWorker(type) {
-        const registration = await Promise.race([
-            navigator.serviceWorker.ready,
-            new Promise((_, reject) => setTimeout(
-                () => reject(new Error('Service Worker не успел подготовиться.')),
-                12000))
-        ]);
-        const worker = registration.active ?? registration.waiting ?? registration.installing;
-        if (!worker) throw new Error('Service Worker недоступен.');
+        if (registration.waiting) {
+            return emptyOfflineStatus('Доступно обновление. Закройте все окна приложения и откройте его снова с интернетом.');
+        }
 
         return await new Promise((resolve, reject) => {
             const channel = new MessageChannel();
-            const timeoutId = setTimeout(
-                () => reject(new Error('Проверка офлайн-файлов заняла слишком много времени.')),
-                30000);
-            channel.port1.onmessage = event => {
+            const close = () => {
                 clearTimeout(timeoutId);
-                resolve({ isSupported: true, ...event.data });
+                channel.port1.close();
+            };
+            const timeoutId = setTimeout(() => {
+                close();
+                reject(new Error('Не удалось проверить все файлы. Повторите загрузку с интернетом.'));
+            }, type === 'CFU_PREPARE_OFFLINE' ? 60000 : 10000);
+            channel.port1.onmessage = event => {
+                close();
+                const status = event.data;
+                if (status?.protocolVersion !== 2) {
+                    resolve(emptyOfflineStatus('Обновите приложение: закройте все его окна и откройте снова с интернетом.'));
+                    return;
+                }
+                resolve({
+                    ...status,
+                    isSupported: true,
+                    isReady: status.isReady === true && status.cachedAssetCount > 0 &&
+                        status.missingAssetCount === 0 && navigator.serviceWorker.controller === worker
+                });
             };
             worker.postMessage({ type }, [channel.port2]);
         });
@@ -133,7 +129,7 @@
     window.cfuOffline = {
         getStatus: async () => {
             try {
-                return await inspectOfflineCache();
+                return await requestOfflineWorker('CFU_CHECK_OFFLINE');
             } catch (error) {
                 return emptyOfflineStatus(error instanceof Error ? error.message : String(error));
             }
@@ -146,10 +142,7 @@
             try {
                 return await requestOfflineWorker('CFU_PREPARE_OFFLINE');
             } catch (error) {
-                const existing = await inspectOfflineCache();
-                return existing.isReady
-                    ? existing
-                    : emptyOfflineStatus(error instanceof Error ? error.message : String(error));
+                return emptyOfflineStatus(error instanceof Error ? error.message : String(error));
             }
         }
     };
