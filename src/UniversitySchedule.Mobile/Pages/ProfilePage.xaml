@@ -94,6 +94,32 @@
                 </VerticalStackLayout>
             </Border>
 
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Border
+                            x:Name="OfflineStatusDot"
+                            HeightRequest="12"
+                            Margin="0,4,0,0"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 6"
+                            WidthRequest="12" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Style="{StaticResource SectionTitle}" Text="Офлайн-версия" />
+                            <Label x:Name="OfflineStatusLabel" Style="{StaticResource SecondaryText}" Text="Офлайн-версия ещё не проверена" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Label
+                        Style="{StaticResource SecondaryText}"
+                        Text="Сохраняет полное расписание выбранной группы и проверяет локальную копию для запуска без сети." />
+                    <Button
+                        x:Name="OfflineDownloadButton"
+                        Clicked="OnDownloadOfflineClicked"
+                        SemanticProperties.Description="Скачать и проверить расписание для работы без интернета"
+                        Text="Скачать данные для офлайна" />
+                </VerticalStackLayout>
+            </Border>
+
             <Button Clicked="OnChangeProfileClicked" Text="Изменить учебную группу" />
         </VerticalStackLayout>
     </ScrollView>

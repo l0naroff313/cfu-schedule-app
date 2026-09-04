@@ -11,6 +11,7 @@ public partial class ProfilePage : ContentPage
     private readonly IServiceProvider _services;
     private readonly ScheduleSession _scheduleSession;
     private readonly PersonalAssignmentStore _assignmentStore;
+    private bool _isPreparingOffline;
 
     public ProfilePage(
         IServiceProvider services,
@@ -38,6 +39,7 @@ public partial class ProfilePage : ContentPage
         CompletionLabel.Text = $"{Math.Round(completion * 100):0}%";
         CompletionRing.Drawable = CreateCompletionRing(completion);
         CompletionRing.Invalidate();
+        await RefreshOfflineStatusAsync();
     }
 
     private async void OnChangeProfileClicked(object? sender, EventArgs e)
@@ -62,6 +64,59 @@ public partial class ProfilePage : ContentPage
     {
         var settingsPage = _services.GetRequiredService<SettingsPage>();
         await Navigation.PushModalAsync(settingsPage);
+    }
+
+    private async void OnDownloadOfflineClicked(object? sender, EventArgs e)
+    {
+        if (_isPreparingOffline)
+        {
+            return;
+        }
+
+        _isPreparingOffline = true;
+        OfflineDownloadButton.IsEnabled = false;
+        OfflineDownloadButton.Text = "Проверяем офлайн-версию…";
+        OfflineStatusLabel.Text = "Сохраняем полное расписание выбранной группы…";
+        try
+        {
+            OfflineSchedulePreparationResult result = await _scheduleSession.PrepareOfflineAsync();
+            ShowOfflineStatus(result.Readiness);
+            if (!result.DownloadedFromNetwork)
+            {
+                OfflineStatusLabel.Text += " • используется последняя сохранённая копия";
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        {
+            await RefreshOfflineStatusAsync();
+            await DisplayAlertAsync(
+                "Офлайн-версия",
+                "Не удалось обновить офлайн-данные. Проверьте интернет и повторите.",
+                "Хорошо");
+        }
+        finally
+        {
+            _isPreparingOffline = false;
+            OfflineDownloadButton.IsEnabled = _scheduleSession.Profile is not null;
+        }
+    }
+
+    private async Task RefreshOfflineStatusAsync()
+    {
+        OfflineScheduleReadiness readiness = await _scheduleSession.CheckOfflineReadinessAsync();
+        ShowOfflineStatus(readiness);
+    }
+
+    private void ShowOfflineStatus(OfflineScheduleReadiness readiness)
+    {
+        OfflineStatusDot.BackgroundColor = Color.FromArgb(readiness.IsReady ? "#82D21E" : "#E5484D");
+        OfflineStatusLabel.Text = readiness.IsReady
+            ? $"Готово • {readiness.LessonCount} занятий • данные от {readiness.UpdatedAtUtc?.ToLocalTime():dd.MM.yyyy HH:mm}"
+            : "Расписание выбранной группы ещё не сохранено";
+        OfflineDownloadButton.Text = readiness.IsReady
+            ? "Обновить офлайн-данные"
+            : "Скачать данные для офлайна";
+        OfflineDownloadButton.IsEnabled = !_isPreparingOffline && _scheduleSession.Profile is not null;
     }
 
     private void ShowProfile(AcademicProfile? profile)

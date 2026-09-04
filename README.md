@@ -200,18 +200,18 @@ dotnet run --project src/UniversitySchedule.ScheduleImporter -- --seed-postgres
 
 ## Текущая версия приложения
 
-Актуальная публичная версия — **КФУ ЭлЖур v1.0.1**.
+Актуальная публичная версия — **КФУ ЭлЖур v1.0.2**.
 
 | Платформа | Текущая версия | Установка |
 | --- | --- | --- |
-| Android | APK v1.0.1 | [Скачать CFU-ElJournal-Android.apk](https://github.com/l0naroff313/cfu-schedule-app/releases/download/v1.0.1/CFU-ElJournal-Android.apk) |
-| iPhone и iPad | PWA v1.0.1 | [Открыть текущую PWA](https://cfu-eljournal-l0naroff313.pages.dev/) |
+| Android | APK v1.0.2 | [Скачать CFU-ElJournal-Android.apk](https://github.com/l0naroff313/cfu-schedule-app/releases/download/v1.0.2/CFU-ElJournal-Android.apk) |
+| iPhone и iPad | PWA v1.0.2 | [Открыть текущую PWA](https://cfu-eljournal-l0naroff313.pages.dev/) |
 
 Общие пользовательские функции поддерживаются синхронно в нативном MAUI-клиенте и PWA. Платформенное исключение допускается только для возможности, которой нет на одной из платформ, и явно документируется.
 
-> **Важно для обновления Android:** APK `v1.0.0` и `v1.0.1` подписаны разными временными тестовыми ключами GitHub Runner. Если `v1.0.0` уже установлена, Android может потребовать удалить её перед установкой `v1.0.1`; удаление приложения очищает его локальные данные. Для обновлений после `v1.0.1` необходимо подключить постоянный release-keystore через GitHub Secrets и не публиковать его в репозитории.
+> **Важно для обновления Android:** опубликованные тестовые APK подписываются временным ключом GitHub Runner. Android может потребовать удалить предыдущую версию перед установкой `v1.0.2`; удаление приложения очищает его локальные данные. Для бесшовных обновлений необходимо подключить постоянный release-keystore через GitHub Secrets и не публиковать его в репозитории.
 
-На Android после загрузки APK может потребоваться разрешить установку приложений из браузера. На iPhone откройте PWA в Safari и выберите **«Поделиться» → «На экран Домой»**. Резервный адрес PWA остаётся на [GitHub Pages](https://l0naroff313.github.io/cfu-schedule-app/). Контрольная сумма Android-сборки опубликована [рядом с APK в GitHub Releases](https://github.com/l0naroff313/cfu-schedule-app/releases/tag/v1.0.1).
+На Android после загрузки APK может потребоваться разрешить установку приложений из браузера. На iPhone откройте PWA в Safari и выберите **«Поделиться» → «На экран Домой»**. В обеих версиях на вкладке «Профиль» есть статус автономной готовности и кнопка сохранения полного расписания выбранной группы. Резервный адрес PWA остаётся на [GitHub Pages](https://l0naroff313.github.io/cfu-schedule-app/). Контрольная сумма Android-сборки опубликована [рядом с APK в GitHub Releases](https://github.com/l0naroff313/cfu-schedule-app/releases/tag/v1.0.2).
 
 ## Дальнейший план
 

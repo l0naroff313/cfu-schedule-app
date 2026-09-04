@@ -1,3 +1,4 @@
+using System.Text.Json;
 using UniversitySchedule.Contracts.Schedule;
 using UniversitySchedule.Mobile.Core.Cfu;
 using UniversitySchedule.Mobile.Core.Profiles;
@@ -99,6 +100,61 @@ public sealed class ScheduleSession(
 
         await TryRefreshAsync(cancellationToken);
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task<OfflineScheduleReadiness> CheckOfflineReadinessAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await InitializeAsync(cancellationToken);
+            if (Profile is null)
+            {
+                return new OfflineScheduleReadiness(false, null, 0, null);
+            }
+
+            CfuScheduleLoadResult? cached = await _scheduleRepository.LoadCachedGroupScheduleAsync(
+                Profile.GroupName,
+                GetSubgroupNumber(Profile),
+                cancellationToken);
+            return cached is null
+                ? new OfflineScheduleReadiness(false, Profile.GroupName, 0, null)
+                : new OfflineScheduleReadiness(
+                    true,
+                    Profile.GroupName,
+                    cached.Snapshot.Lessons.Count,
+                    cached.UpdatedAtUtc);
+        }
+        catch (Exception exception) when (exception is InvalidDataException or JsonException)
+        {
+            return new OfflineScheduleReadiness(false, Profile?.GroupName, 0, null);
+        }
+    }
+
+    public async Task<OfflineSchedulePreparationResult> PrepareOfflineAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        if (Profile is null)
+        {
+            throw new InvalidOperationException("Сначала выберите учебную группу.");
+        }
+
+        CfuScheduleLoadResult result = await _scheduleRepository.LoadGroupScheduleAsync(
+            Profile.GroupName,
+            GetSubgroupNumber(Profile),
+            cancellationToken);
+        Apply(result);
+
+        OfflineScheduleReadiness readiness = await CheckOfflineReadinessAsync(cancellationToken);
+        if (!readiness.IsReady)
+        {
+            throw new InvalidOperationException("Не удалось проверить сохранённую копию расписания.");
+        }
+
+        LastError = null;
+        Changed?.Invoke(this, EventArgs.Empty);
+        return new OfflineSchedulePreparationResult(readiness, !result.IsFromCache);
     }
 
     private async Task TryRefreshAsync(CancellationToken cancellationToken)

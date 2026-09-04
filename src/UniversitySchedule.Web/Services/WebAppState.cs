@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using Microsoft.JSInterop;
 using UniversitySchedule.Contracts.Catalog;
 using UniversitySchedule.Contracts.Schedule;
 using UniversitySchedule.Mobile.Core.Assignments;
@@ -30,6 +31,7 @@ public sealed class WebAppState(
     InstallationIdentityService installationIdentity,
     IReferenceCatalogProvider referenceCatalogProvider,
     BrowserThemeService themeService,
+    WebOfflineShellService offlineShellService,
     PersonalDataSyncQueue syncQueue,
     PersonalDataSynchronizer synchronizer,
     PersonalDataSnapshotRestorer snapshotRestorer,
@@ -93,6 +95,14 @@ public sealed class WebAppState(
     public IReadOnlyList<PersonalAssignment> Assignments { get; private set; } = [];
 
     public string SyncStatusText { get; private set; } = "Локальные данные";
+
+    public bool IsPreparingOffline { get; private set; }
+
+    public bool IsOfflineReady { get; private set; }
+
+    public string OfflineStatusText { get; private set; } = "Офлайн-версия ещё не проверена";
+
+    public int OfflineLessonCount { get; private set; }
 
     public AcademicProfile? Profile => scheduleSession.Profile;
 
@@ -225,6 +235,7 @@ public sealed class WebAppState(
             }
 
             await RefreshSyncStatusAsync(cancellationToken);
+            await RefreshOfflineReadinessAsync(cancellationToken);
             syncCoordinator.StartBackgroundSynchronization();
             dailyScheduleRefresh.RefreshAttempted += OnDailyScheduleRefreshAttempted;
             dailyScheduleRefresh.Start();
@@ -378,6 +389,7 @@ public sealed class WebAppState(
             IsProfileEditorOpen = false;
             ActiveTab = WebTab.Today;
             SelectedDate = TodayAtUniversity(timeProvider);
+            await RefreshOfflineReadinessAsync(cancellationToken);
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
         {
@@ -570,6 +582,49 @@ public sealed class WebAppState(
         }
     }
 
+    public async Task PrepareOfflineAsync(CancellationToken cancellationToken = default)
+    {
+        if (Profile is null || IsPreparingOffline)
+        {
+            return;
+        }
+
+        IsPreparingOffline = true;
+        IsBusy = true;
+        ErrorText = null;
+        OfflineStatusText = "Сохраняем расписание и файлы приложения…";
+        NotifyChanged();
+        try
+        {
+            OfflineSchedulePreparationResult preparation =
+                await scheduleSession.PrepareOfflineAsync(cancellationToken);
+            WebOfflineShellStatus shell = await offlineShellService.PrepareAsync(cancellationToken);
+            ApplyOfflineReadiness(preparation.Readiness, shell);
+            if (!IsOfflineReady)
+            {
+                ErrorText = shell.Error ?? "Не удалось полностью подготовить автономную версию.";
+            }
+            else if (!preparation.DownloadedFromNetwork)
+            {
+                OfflineStatusText += " • используется последняя сохранённая копия";
+            }
+        }
+        catch (Exception exception) when (
+            exception is HttpRequestException or InvalidOperationException or JSException)
+        {
+            await RefreshOfflineReadinessAsync(cancellationToken);
+            ErrorText = IsOfflineReady
+                ? "Свежие данные недоступны, но сохранённая офлайн-версия готова."
+                : "Не удалось скачать данные для офлайн-режима. Проверьте интернет и повторите.";
+        }
+        finally
+        {
+            IsPreparingOffline = false;
+            IsBusy = false;
+            NotifyChanged();
+        }
+    }
+
     public ScheduleLesson? FindLesson(Guid? lessonId) => lessonId is null
         ? null
         : (Schedule?.Lessons ?? []).FirstOrDefault(lesson => lesson.Id == lessonId);
@@ -668,6 +723,46 @@ public sealed class WebAppState(
                 : pending > 0
                     ? $"Ожидают синхронизации: {pending}"
                     : "Синхронизировано";
+    }
+
+    private async Task RefreshOfflineReadinessAsync(CancellationToken cancellationToken)
+    {
+        OfflineScheduleReadiness schedule;
+        try
+        {
+            schedule = await scheduleSession.CheckOfflineReadinessAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        {
+            schedule = new OfflineScheduleReadiness(false, Profile?.GroupName, 0, null);
+        }
+
+        WebOfflineShellStatus shell;
+        try
+        {
+            shell = await offlineShellService.GetStatusAsync(cancellationToken);
+        }
+        catch (JSException exception)
+        {
+            shell = new WebOfflineShellStatus(false, false, 0, 0, exception.Message);
+        }
+
+        ApplyOfflineReadiness(schedule, shell);
+    }
+
+    private void ApplyOfflineReadiness(
+        OfflineScheduleReadiness schedule,
+        WebOfflineShellStatus shell)
+    {
+        OfflineLessonCount = schedule.LessonCount;
+        IsOfflineReady = schedule.IsReady && shell.IsReady;
+        OfflineStatusText = IsOfflineReady
+            ? $"Готово • {schedule.LessonCount} занятий • данные от {schedule.UpdatedAtUtc?.ToLocalTime():dd.MM.yyyy HH:mm}"
+            : !schedule.IsReady
+                ? "Расписание выбранной группы ещё не сохранено"
+                : !shell.IsSupported
+                    ? "Браузер не поддерживает автономную установку"
+                    : "Расписание сохранено, файлы приложения ещё не готовы";
     }
 
     private static string SearchableTeacherText(TeacherReference teacher) => NormalizeSearch(

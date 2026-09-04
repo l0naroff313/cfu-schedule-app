@@ -26,6 +26,7 @@ builder.Services.AddScoped<BrowserStorage>();
 builder.Services.AddScoped<ILocalDataStore>(services => services.GetRequiredService<BrowserStorage>());
 builder.Services.AddScoped<ISecureValueStore>(services => services.GetRequiredService<BrowserStorage>());
 builder.Services.AddScoped<BrowserThemeService>();
+builder.Services.AddScoped<WebOfflineShellService>();
 builder.Services.AddScoped<IReferenceCatalogProvider, WebReferenceCatalogProvider>();
 builder.Services.AddScoped(services => new CfuScheduleRepository(
     new HttpClient
@@ -40,7 +41,7 @@ builder.Services.AddScoped<DailyScheduleRefreshService>();
 builder.Services.AddScoped<InstallationIdentityService>();
 
 Uri? apiBaseAddress = TryGetHttpsUri(builder.Configuration["UniversityScheduleApi:BaseUrl"]);
-var apiOptions = new UniversityScheduleApiOptions(apiBaseAddress, "web", "1.0.1");
+var apiOptions = new UniversityScheduleApiOptions(apiBaseAddress, "web", "1.0.2");
 builder.Services.AddSingleton(apiOptions);
 builder.Services.AddScoped(services => new UniversityScheduleApiClient(
     new HttpClient

@@ -287,6 +287,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .settings-list small { display: block; overflow: hidden; max-width: 280px; margin-top: 3px; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .settings-list b { color: var(--muted); font-size: 18px; font-weight: 400; }
 .monospace { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
+.offline-card { display: grid; gap: 12px; padding: 14px; box-shadow: none; }
+.offline-card-heading { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 10px; }
+.offline-status-dot { width: 11px; height: 11px; margin-top: 3px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 14%, transparent); }
+.offline-card.ready .offline-status-dot { background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent); }
+.offline-card h2 { font-size: 13px; }
+.offline-card-heading p { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.offline-explanation { color: var(--muted); font-size: 10px; line-height: 1.5; }
 .install-card { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 14px; box-shadow: none; }
 .install-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 11px; background: var(--brand); }
 .install-icon span { width: 19px; height: 19px; border: 2px solid white; border-radius: 4px; box-shadow: inset 0 -5px 0 rgba(255,255,255,.2); }

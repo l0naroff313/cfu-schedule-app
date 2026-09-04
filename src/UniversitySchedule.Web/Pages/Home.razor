@@ -479,6 +479,20 @@ else
                 <div class="settings-static"><span class="settings-symbol">#</span><span><strong>Установочный ID</strong><small class="monospace">@State.InstallationId</small></span></div>
             </div>
 
+            <article class="offline-card card @(State.IsOfflineReady ? "ready" : null)">
+                <div class="offline-card-heading">
+                    <span class="offline-status-dot" aria-hidden="true"></span>
+                    <div>
+                        <h2>Офлайн-версия</h2>
+                        <p>@State.OfflineStatusText</p>
+                    </div>
+                </div>
+                <p class="offline-explanation">Сохраняет полное расписание выбранной группы и проверяет файлы приложения для запуска без сети.</p>
+                <button class="primary-button full-width" type="button" disabled="@(State.IsBusy || State.Profile is null)" @onclick="PrepareOfflineAsync">
+                    @(State.IsPreparingOffline ? "Проверяем офлайн-версию…" : State.IsOfflineReady ? "Обновить офлайн-данные" : "Скачать данные для офлайна")
+                </button>
+            </article>
+
             <article class="install-card card">
                 <div class="install-icon"><span></span></div>
                 <div>
@@ -636,6 +650,8 @@ else
     }
 
     private async Task RefreshScheduleAsync() => await State.RefreshScheduleAsync();
+
+    private async Task PrepareOfflineAsync() => await State.PrepareOfflineAsync();
 
     private async Task ToggleThemeAsync() => await State.ToggleThemeAsync();
 

@@ -72,6 +72,88 @@
         isStandalone: () => matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
     };
 
+    function emptyOfflineStatus(error = null) {
+        return {
+            isSupported: 'serviceWorker' in navigator && 'caches' in window,
+            isReady: false,
+            cachedAssetCount: 0,
+            missingAssetCount: 0,
+            error
+        };
+    }
+
+    async function inspectOfflineCache() {
+        if (!('serviceWorker' in navigator) || !('caches' in window)) {
+            return emptyOfflineStatus('Автономный режим не поддерживается этим браузером.');
+        }
+
+        const names = (await caches.keys()).filter(name => name.startsWith('cfu-eljournal-cache-'));
+        if (names.length === 0) return emptyOfflineStatus();
+
+        let cachedAssetCount = 0;
+        for (const name of names) {
+            const cache = await caches.open(name);
+            cachedAssetCount += (await cache.keys()).length;
+        }
+
+        const indexUrl = new URL('index.html', document.baseURI).href;
+        const hasAppShell = await caches.match(indexUrl) !== undefined;
+        return {
+            isSupported: true,
+            isReady: hasAppShell && cachedAssetCount > 0,
+            cachedAssetCount,
+            missingAssetCount: 0,
+            error: null
+        };
+    }
+
+    async function requestOfflineWorker(type) {
+        const registration = await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((_, reject) => setTimeout(
+                () => reject(new Error('Service Worker не успел подготовиться.')),
+                12000))
+        ]);
+        const worker = registration.active ?? registration.waiting ?? registration.installing;
+        if (!worker) throw new Error('Service Worker недоступен.');
+
+        return await new Promise((resolve, reject) => {
+            const channel = new MessageChannel();
+            const timeoutId = setTimeout(
+                () => reject(new Error('Проверка офлайн-файлов заняла слишком много времени.')),
+                30000);
+            channel.port1.onmessage = event => {
+                clearTimeout(timeoutId);
+                resolve({ isSupported: true, ...event.data });
+            };
+            worker.postMessage({ type }, [channel.port2]);
+        });
+    }
+
+    window.cfuOffline = {
+        getStatus: async () => {
+            try {
+                return await inspectOfflineCache();
+            } catch (error) {
+                return emptyOfflineStatus(error instanceof Error ? error.message : String(error));
+            }
+        },
+        prepare: async () => {
+            if (!('serviceWorker' in navigator) || !('caches' in window)) {
+                return emptyOfflineStatus('Автономный режим не поддерживается этим браузером.');
+            }
+
+            try {
+                return await requestOfflineWorker('CFU_PREPARE_OFFLINE');
+            } catch (error) {
+                const existing = await inspectOfflineCache();
+                return existing.isReady
+                    ? existing
+                    : emptyOfflineStatus(error instanceof Error ? error.message : String(error));
+            }
+        }
+    };
+
     const swipeRegistrations = new Map();
     let nextSwipeRegistrationId = 1;
     let lastSwipeInvocationAt = 0;
