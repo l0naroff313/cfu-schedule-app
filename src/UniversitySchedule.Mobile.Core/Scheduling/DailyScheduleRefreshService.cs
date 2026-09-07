@@ -75,11 +75,23 @@ public sealed class DailyScheduleRefreshService(
 
     private async Task RunAsync(CancellationToken cancellationToken)
     {
+        // Let the caller render saved data before starting refresh work.
+        await Task.Yield();
+        bool firstCheck = true;
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
-                await CheckNowAsync(cancellationToken);
+                if (firstCheck)
+                {
+                    firstCheck = false;
+                    await _scheduleSession.RefreshAsync(cancellationToken);
+                    RefreshAttempted?.Invoke(this, EventArgs.Empty);
+                }
+                else
+                {
+                    await CheckNowAsync(cancellationToken);
+                }
             }
             catch (Exception exception) when (
                 exception is HttpRequestException or InvalidOperationException or TaskCanceledException &&

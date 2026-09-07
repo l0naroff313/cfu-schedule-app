@@ -235,10 +235,6 @@ public sealed class WebAppState(
             }
 
             await RefreshSyncStatusAsync(cancellationToken);
-            await RefreshOfflineReadinessAsync(cancellationToken);
-            syncCoordinator.StartBackgroundSynchronization();
-            dailyScheduleRefresh.RefreshAttempted += OnDailyScheduleRefreshAttempted;
-            dailyScheduleRefresh.Start();
             _initialized = true;
         }
         finally
@@ -247,6 +243,17 @@ public sealed class WebAppState(
             IsBusy = false;
             NotifyChanged();
         }
+    }
+
+    private bool _backgroundServicesStarted;
+
+    public void StartBackgroundServices()
+    {
+        if (!IsInitialized || _backgroundServicesStarted) return;
+        _backgroundServicesStarted = true;
+        scheduleSession.Changed += OnDailyScheduleRefreshAttempted;
+        syncCoordinator.StartBackgroundSynchronization();
+        dailyScheduleRefresh.Start();
     }
 
     public async Task SetTabAsync(WebTab tab, CancellationToken cancellationToken = default)
@@ -394,7 +401,8 @@ public sealed class WebAppState(
             IsProfileEditorOpen = false;
             ActiveTab = WebTab.Today;
             SelectedDate = TodayAtUniversity(timeProvider);
-            await RefreshOfflineReadinessAsync(cancellationToken);
+            IsOfflineReady = false;
+            OfflineStatusText = "Расписание сохранено. Проверка файлов доступна в профиле.";
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
         {
@@ -596,7 +604,6 @@ public sealed class WebAppState(
 
         IsPreparingOffline = true;
         IsOfflineReady = false;
-        IsBusy = true;
         ErrorText = null;
         OfflineStatusText = "Сохраняем расписание и файлы приложения…";
         NotifyChanged();
@@ -626,7 +633,6 @@ public sealed class WebAppState(
         finally
         {
             IsPreparingOffline = false;
-            IsBusy = false;
             NotifyChanged();
         }
     }

@@ -78,6 +78,106 @@ public sealed class ScheduleSessionOfflineTests
         Assert.True(result.Readiness.LessonCount > 0);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Initialize_AndReadiness_NeverContactNetworkOrOverrideProvider(bool hasCache)
+    {
+        var store = new MemoryStore();
+        var profiles = new AcademicProfileStore(store);
+        await profiles.SaveAsync(CreateProfile());
+        if (hasCache)
+        {
+            // The legacy format must also start without a migration download.
+            await store.SaveAsync(new LocalDocument("cfu:index", IndexJson, DateTimeOffset.UtcNow));
+            await store.SaveAsync(new LocalDocument("cfu:group:пи-б-о-252", GroupJson, DateTimeOffset.UtcNow));
+        }
+        using var client = new HttpClient(new ResponseHandler(_ => throw new Exception("Unexpected network request")))
+        {
+            BaseAddress = new Uri(CfuScheduleRepository.BaseAddress),
+        };
+        var session = new ScheduleSession(profiles, new CfuScheduleRepository(client, store, new NoStartupProvider()));
+
+        await session.InitializeAsync().WaitAsync(TimeSpan.FromSeconds(2));
+        var readiness = await session.CheckOfflineReadinessAsync().WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.NotNull(session.Profile);
+        Assert.Equal(hasCache, session.Snapshot is not null);
+        Assert.Equal(hasCache, readiness.IsReady);
+        if (hasCache) Assert.Equal("Алгоритмы", Assert.Single(session.Snapshot!.Lessons).Subject);
+    }
+
+    [Fact]
+    public async Task Initialize_CorruptCache_DoesNotPreventOpeningOrRepair()
+    {
+        var store = new MemoryStore();
+        var profiles = new AcademicProfileStore(store);
+        await profiles.SaveAsync(CreateProfile());
+        await store.SaveAsync(new LocalDocument("cfu:cached-group:пи-б-о-252", "broken json", DateTimeOffset.UtcNow));
+        var session = new ScheduleSession(profiles, new CfuScheduleRepository(CreateSuccessfulClient(), store));
+
+        await session.InitializeAsync();
+        Assert.Null(session.Snapshot);
+        Assert.NotNull(session.LastError);
+        Assert.False((await session.CheckOfflineReadinessAsync()).IsReady);
+        await session.PrepareOfflineAsync();
+        Assert.True((await session.CheckOfflineReadinessAsync()).IsReady);
+        Assert.Null(session.LastError);
+    }
+
+    [Fact]
+    public async Task Refresh_SlowNetwork_KeepsSavedScheduleVisibleUntilReplacement()
+    {
+        var store = new MemoryStore();
+        var profiles = new AcademicProfileStore(store);
+        await new ScheduleSession(profiles, new CfuScheduleRepository(CreateSuccessfulClient(), store))
+            .SetProfileAsync(CreateProfile());
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var client = new HttpClient(new DelayedHandler(gate.Task))
+        {
+            BaseAddress = new Uri(CfuScheduleRepository.BaseAddress),
+        };
+        var session = new ScheduleSession(profiles, new CfuScheduleRepository(client, store));
+        await session.InitializeAsync();
+        int changes = 0;
+        session.Changed += (_, _) => changes++;
+
+        Task refresh = session.RefreshAsync();
+        Assert.False(refresh.IsCompleted);
+        Assert.Equal("Алгоритмы", Assert.Single(session.Snapshot!.Lessons).Subject);
+        Assert.True(session.IsFromCache);
+        gate.SetResult();
+        await refresh;
+        Assert.Equal("Новое расписание", Assert.Single(session.Snapshot.Lessons).Subject);
+        Assert.Equal(1, changes);
+        Assert.False(session.IsFromCache);
+
+        // An unrelated teacher request must not corrupt the saved group's calendar.
+        await store.SaveAsync(new LocalDocument("cfu:index", "broken json", DateTimeOffset.UtcNow));
+        var reopened = new ScheduleSession(profiles, new CfuScheduleRepository(client, store, new NoStartupProvider()));
+        await reopened.InitializeAsync();
+        Assert.Equal("Новое расписание", Assert.Single(reopened.Snapshot!.Lessons).Subject);
+    }
+
+    private sealed class NoStartupProvider : IManualScheduleOverrideProvider
+    {
+        public Task<ManualScheduleOverrideDocument?> LoadAsync(CancellationToken cancellationToken = default) =>
+            throw new Exception("Startup/readiness must not load the full Excel override catalog");
+    }
+
+    private sealed class DelayedHandler(Task gate) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await gate.WaitAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(request.RequestUri!.AbsolutePath.EndsWith("index", StringComparison.Ordinal)
+                    ? IndexJson : GroupJson.Replace("Алгоритмы", "Новое расписание"), Encoding.UTF8, "application/json"),
+            };
+        }
+    }
+
     private static AcademicProfile CreateProfile() => new(
         Guid.NewGuid(),
         "Физико-технический институт",

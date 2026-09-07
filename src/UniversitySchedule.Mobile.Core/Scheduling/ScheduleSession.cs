@@ -16,6 +16,7 @@ public sealed class ScheduleSession(
         ?? throw new ArgumentNullException(nameof(scheduleRepository));
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
+    private readonly SemaphoreSlim _updateLock = new(1, 1);
     private bool _initialized;
 
     public event EventHandler? Changed;
@@ -50,16 +51,16 @@ public sealed class ScheduleSession(
             Profile = await _profileStore.GetAsync(cancellationToken);
             if (Profile is not null)
             {
-                CfuScheduleLoadResult? cached = await _scheduleRepository.LoadCachedGroupScheduleAsync(
-                    Profile.GroupName,
-                    GetSubgroupNumber(Profile),
-                    cancellationToken);
-                if (cached is not null)
+                try
                 {
-                    Apply(cached);
+                    CfuScheduleLoadResult? cached = await _scheduleRepository.LoadCachedGroupScheduleAsync(
+                        Profile.GroupName, GetSubgroupNumber(Profile), cancellationToken);
+                    if (cached is not null) Apply(cached);
                 }
-
-                await TryRefreshAsync(cancellationToken);
+                catch (Exception exception) when (exception is InvalidDataException or JsonException)
+                {
+                    LastError = "Сохранённое расписание повреждено. Обновите офлайн-данные при подключении к сети.";
+                }
             }
 
             _initialized = true;
@@ -76,30 +77,39 @@ public sealed class ScheduleSession(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(profile);
-
-        CfuScheduleLoadResult result = await _scheduleRepository.LoadGroupScheduleAsync(
-            profile.GroupName,
-            GetSubgroupNumber(profile),
-            cancellationToken);
-        await _profileStore.SaveAsync(profile, cancellationToken);
-
-        Profile = profile;
-        Apply(result);
-        LastError = null;
-        _initialized = true;
-        Changed?.Invoke(this, EventArgs.Empty);
+        await InitializeAsync(cancellationToken);
+        await _updateLock.WaitAsync(cancellationToken);
+        try
+        {
+            CfuScheduleLoadResult result = await _scheduleRepository.LoadGroupScheduleAsync(
+                profile.GroupName, GetSubgroupNumber(profile), cancellationToken);
+            await _profileStore.SaveAsync(profile, cancellationToken);
+            Profile = profile;
+            LastNetworkRefreshAtUtc = null;
+            Apply(result);
+            LastError = null;
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+        finally
+        {
+            _updateLock.Release();
+        }
     }
 
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         await InitializeAsync(cancellationToken);
-        if (Profile is null)
+        await _updateLock.WaitAsync(cancellationToken);
+        try
         {
-            return;
+            if (Profile is null) return;
+            await TryRefreshAsync(cancellationToken);
+            Changed?.Invoke(this, EventArgs.Empty);
         }
-
-        await TryRefreshAsync(cancellationToken);
-        Changed?.Invoke(this, EventArgs.Empty);
+        finally
+        {
+            _updateLock.Release();
+        }
     }
 
     public async Task<OfflineScheduleReadiness> CheckOfflineReadinessAsync(
@@ -135,6 +145,19 @@ public sealed class ScheduleSession(
         CancellationToken cancellationToken = default)
     {
         await InitializeAsync(cancellationToken);
+        await _updateLock.WaitAsync(cancellationToken);
+        try
+        {
+            return await PrepareOfflineCoreAsync(cancellationToken);
+        }
+        finally
+        {
+            _updateLock.Release();
+        }
+    }
+
+    private async Task<OfflineSchedulePreparationResult> PrepareOfflineCoreAsync(CancellationToken cancellationToken)
+    {
         if (Profile is null)
         {
             throw new InvalidOperationException("Сначала выберите учебную группу.");
@@ -168,7 +191,8 @@ public sealed class ScheduleSession(
             Apply(result);
             LastError = null;
         }
-        catch (InvalidOperationException exception) when (Snapshot is not null)
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException or InvalidDataException or JsonException ||
+            exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
         {
             IsFromCache = true;
             LastError = exception.Message;

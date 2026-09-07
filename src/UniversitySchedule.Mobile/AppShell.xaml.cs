@@ -66,6 +66,7 @@ public partial class AppShell : Shell
             try
             {
                 await _scheduleSession.InitializeAsync();
+                await _scheduleSession.RefreshAsync();
             }
             catch (Exception exception)
             {

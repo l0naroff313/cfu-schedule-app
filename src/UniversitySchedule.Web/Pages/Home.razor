@@ -126,6 +126,7 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        State.StartBackgroundServices();
         if (!State.IsInitialized || _swipeRegistrationId is not null || _isSwipeAttachmentPending || _isDisposed)
         {
             return;
@@ -488,8 +489,8 @@ else
                     </div>
                 </div>
                 <p class="offline-explanation">Сохраняет полное расписание выбранной группы и проверяет файлы приложения для запуска без сети.</p>
-                <button class="primary-button full-width" type="button" disabled="@(State.IsBusy || State.Profile is null)" @onclick="PrepareOfflineAsync">
-                    @(State.IsPreparingOffline ? "Проверяем офлайн-версию…" : State.IsOfflineReady ? "Обновить офлайн-данные" : "Скачать данные для офлайна")
+                <button class="primary-button full-width" type="button" disabled="@(State.IsBusy || State.IsPreparingOffline || State.Profile is null)" @onclick="PrepareOfflineAsync">
+                    @(State.IsPreparingOffline ? "Проверяем офлайн-версию…" : "Обновить офлайн-данные")
                 </button>
             </article>
 

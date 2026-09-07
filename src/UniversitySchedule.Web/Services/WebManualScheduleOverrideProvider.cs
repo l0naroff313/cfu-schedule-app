@@ -23,13 +23,13 @@ public sealed class WebManualScheduleOverrideProvider(HttpClient httpClient) : I
             return _document;
         }
 
-        _loaded = true;
         try
         {
             _document = await httpClient.GetFromJsonAsync<ManualScheduleOverrideDocument>(
                 "data/cfu-manual-schedule.json",
                 JsonOptions,
                 cancellationToken);
+            _loaded = true;
         }
         catch (HttpRequestException)
         {

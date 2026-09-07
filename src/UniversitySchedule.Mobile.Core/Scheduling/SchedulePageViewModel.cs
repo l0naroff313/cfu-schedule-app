@@ -371,6 +371,8 @@ public sealed class SchedulePageViewModel : ObservableObject
         try
         {
             await _scheduleSession.InitializeAsync(cancellationToken);
+            ApplySession();
+            IsLoading = false;
             await LoadReferenceCatalogAsync(cancellationToken);
             ApplySession();
         }

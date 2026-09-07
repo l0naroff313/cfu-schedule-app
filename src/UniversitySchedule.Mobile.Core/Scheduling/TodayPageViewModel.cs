@@ -145,6 +145,8 @@ public sealed class TodayPageViewModel : ObservableObject
         try
         {
             await _scheduleSession.InitializeAsync(cancellationToken);
+            Refresh();
+            IsLoading = false;
             _referenceCatalog = await _referenceCatalogProvider.LoadAsync(cancellationToken);
             _assignments = await _assignmentStore.GetAllAsync(cancellationToken);
             Refresh();

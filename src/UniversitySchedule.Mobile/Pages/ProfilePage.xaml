@@ -116,7 +116,7 @@
                         x:Name="OfflineDownloadButton"
                         Clicked="OnDownloadOfflineClicked"
                         SemanticProperties.Description="Скачать и проверить расписание для работы без интернета"
-                        Text="Скачать данные для офлайна" />
+                        Text="Обновить офлайн-данные" />
                 </VerticalStackLayout>
             </Border>
 

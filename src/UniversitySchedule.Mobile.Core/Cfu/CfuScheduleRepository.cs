@@ -37,6 +37,7 @@ public sealed class CfuScheduleRepository
 	private readonly IManualScheduleOverrideProvider _manualScheduleOverrideProvider;
 	private ManualScheduleOverrideDocument? _manualScheduleOverride;
 	private bool _manualScheduleLoaded;
+	private readonly SemaphoreSlim _manualScheduleLock = new(1, 1);
 
 	public CfuScheduleRepository(
 		HttpClient httpClient,
@@ -89,16 +90,18 @@ public sealed class CfuScheduleRepository
     {
 		ArgumentException.ThrowIfNullOrWhiteSpace(groupCode);
 
-		ManualScheduleOverrideDocument? manual = await LoadManualScheduleOverrideAsync(cancellationToken);
-		CfuGroupScheduleDocument? manualSchedule = manual?.FindGroup(groupCode);
-		if (manual is not null && manualSchedule is not null && manual.Bells.Count > 0)
+		// Startup and readiness checks must only read durable local storage.
+		LocalDocument? saved = await _localDataStore.GetAsync(CachedGroupKey(groupCode), cancellationToken);
+		if (saved is not null)
 		{
+			CachedGroupDocument pair = Deserialize<CachedGroupDocument>(saved.Content, value => value);
 			return new CfuScheduleLoadResult(
-				CfuScheduleMapper.MapGroup(manual.ToIndex(), manualSchedule, subgroup),
-				manual.ImportedAtUtc,
+				CfuScheduleMapper.MapGroup(ValidateIndex(pair.Index), ValidateGroup(pair.Schedule, groupCode), subgroup),
+				saved.UpdatedAtUtc,
 				IsFromCache: true);
 		}
 
+		// Compatibility with copies saved by earlier app versions.
 		LocalDocument? indexDocument = await _localDataStore.GetAsync(IndexKey, cancellationToken);
         LocalDocument? groupDocument = await _localDataStore.GetAsync(GroupKey(groupCode), cancellationToken);
         if (indexDocument is null || groupDocument is null)
@@ -130,19 +133,7 @@ public sealed class CfuScheduleRepository
 		CfuGroupScheduleDocument? manualSchedule = manual?.FindGroup(groupCode);
 			if (manual is not null && manualSchedule is not null && manual.Bells.Count > 0)
 		{
-			CfuScheduleIndexDocument manualIndex;
-			try
-			{
-				manualIndex = (await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
-					IndexKey,
-					"index",
-					ValidateIndex,
-					cancellationToken)).Value;
-			}
-			catch (InvalidOperationException)
-			{
-				manualIndex = manual.ToIndex();
-			}
+			CfuScheduleIndexDocument manualIndex = manual.ToIndex();
 			await SaveManualScheduleCacheAsync(manualIndex, manualSchedule, manual.ImportedAtUtc, cancellationToken);
 
 			return new CfuScheduleLoadResult(
@@ -165,6 +156,7 @@ public sealed class CfuScheduleRepository
             ? index.UpdatedAtUtc
             : schedule.UpdatedAtUtc;
 
+        await SavePairedCacheAsync(index.Value, schedule.Value, updatedAt, cancellationToken);
         return new CfuScheduleLoadResult(
             CfuScheduleMapper.MapGroup(index.Value, schedule.Value, subgroup),
             updatedAt,
@@ -270,10 +262,12 @@ public sealed class CfuScheduleRepository
 			return _manualScheduleOverride;
 		}
 
-		_manualScheduleLoaded = true;
+		await _manualScheduleLock.WaitAsync(cancellationToken);
 		try
 		{
+			if (_manualScheduleLoaded) return _manualScheduleOverride;
 			_manualScheduleOverride = await _manualScheduleOverrideProvider.LoadAsync(cancellationToken);
+			_manualScheduleLoaded = _manualScheduleOverride is not null;
 		}
 		catch (HttpRequestException)
 		{
@@ -286,6 +280,14 @@ public sealed class CfuScheduleRepository
 		catch (InvalidDataException)
 		{
 			_manualScheduleOverride = null;
+		}
+		catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+		{
+			_manualScheduleOverride = null;
+		}
+		finally
+		{
+			_manualScheduleLock.Release();
 		}
 
 		return _manualScheduleOverride;
@@ -303,7 +305,17 @@ public sealed class CfuScheduleRepository
 		await _localDataStore.SaveAsync(
 			new LocalDocument(GroupKey(schedule.Code), JsonSerializer.Serialize(schedule, JsonOptions), updatedAtUtc),
 			cancellationToken);
+		await SavePairedCacheAsync(index, schedule, updatedAtUtc, cancellationToken);
 	}
+
+	// Keep the group's calendar and lessons together even when teacher/catalog requests change the global index.
+	private Task SavePairedCacheAsync(CfuScheduleIndexDocument index, CfuGroupScheduleDocument schedule,
+		DateTimeOffset updatedAtUtc, CancellationToken cancellationToken) =>
+		_localDataStore.SaveAsync(new LocalDocument(CachedGroupKey(schedule.Code),
+			JsonSerializer.Serialize(new CachedGroupDocument(index, schedule), JsonOptions), updatedAtUtc), cancellationToken);
+
+	private static string CachedGroupKey(string groupCode) => $"cfu:cached-group:{NormalizeKey(groupCode)}";
+	private sealed record CachedGroupDocument(CfuScheduleIndexDocument Index, CfuGroupScheduleDocument Schedule);
 
 	private static CfuScheduleIndexDocument MergeCatalogIndex(
 		CfuScheduleIndexDocument official,
@@ -371,7 +383,8 @@ public sealed class CfuScheduleRepository
 
     private static CfuScheduleIndexDocument ValidateIndex(CfuScheduleIndexDocument index)
     {
-        if (index.Tree.Count == 0 || index.Bells.Count == 0)
+        if (index is null || index.Tree is null || index.Tree.Count == 0 || index.Bells is null ||
+            index.Bells.Count == 0 || index.Weeks is null)
         {
             throw new InvalidDataException("CFU catalog has no institutes or bell schedule.");
         }
@@ -383,7 +396,7 @@ public sealed class CfuScheduleRepository
         CfuGroupScheduleDocument schedule,
         string requestedGroupCode)
     {
-        if (!string.Equals(
+        if (schedule is null || schedule.Lessons is null || string.IsNullOrWhiteSpace(schedule.Code) || !string.Equals(
                 schedule.Code.Trim(),
                 requestedGroupCode.Trim(),
                 StringComparison.OrdinalIgnoreCase))

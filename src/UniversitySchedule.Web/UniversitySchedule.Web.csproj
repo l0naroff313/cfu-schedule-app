@@ -26,6 +26,10 @@
              Condition="Exists('wwwroot\data\cfu-reference-catalog.json')"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="wwwroot\data\cfu-manual-schedule.json"
+             Condition="!Exists('wwwroot\data\cfu-manual-schedule.json')"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
     <Content Update="wwwroot\data\cfu-manual-schedule.json"
              Condition="Exists('wwwroot\data\cfu-manual-schedule.json')"
              CopyToOutputDirectory="PreserveNewest"

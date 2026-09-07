@@ -113,9 +113,7 @@ public partial class ProfilePage : ContentPage
         OfflineStatusLabel.Text = readiness.IsReady
             ? $"Готово • {readiness.LessonCount} занятий • данные от {readiness.UpdatedAtUtc?.ToLocalTime():dd.MM.yyyy HH:mm}"
             : "Расписание выбранной группы ещё не сохранено";
-        OfflineDownloadButton.Text = readiness.IsReady
-            ? "Обновить офлайн-данные"
-            : "Скачать данные для офлайна";
+        OfflineDownloadButton.Text = "Обновить офлайн-данные";
         OfflineDownloadButton.IsEnabled = !_isPreparingOffline && _scheduleSession.Profile is not null;
     }
 

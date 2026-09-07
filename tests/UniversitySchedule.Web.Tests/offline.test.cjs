@@ -136,6 +136,35 @@ for (const [browserName, browserType] of [['chromium', chromium], ['webkit', web
             assert.equal(repaired.isReady, true);
             assert.ok(await page.evaluate(url => caches.match(url).then(Boolean), removed));
 
+            // A stalled readiness check must never hold the startup splash screen.
+            // This also verifies that the saved timetable is rendered before background work.
+            await page.close();
+            page = await context.newPage();
+            await page.addInitScript(() => {
+                let offline;
+                Object.defineProperty(window, 'cfuOffline', {
+                    configurable: true,
+                    get: () => offline,
+                    set: value => {
+                        offline = value;
+                        const original = value.getStatus;
+                        value.getStatus = () => {
+                            window.startupReadinessCalls = (window.startupReadinessCalls || 0) + 1;
+                            return new Promise(() => {});
+                        };
+                        window.restoreReadiness = () => { value.getStatus = original; };
+                    }
+                });
+            });
+            const startupAt = Date.now();
+            await page.goto(`${server.url}?startup-test=1`, { waitUntil: 'domcontentloaded' });
+            await page.getByRole('navigation').getByRole('button', { name: 'Расписание', exact: true })
+                .waitFor({ timeout: 8000 });
+            assert.equal(await page.evaluate(() => window.startupReadinessCalls || 0), 0);
+            await page.getByRole('heading', { name: 'Расписание на сегодня', exact: true }).waitFor({ timeout: 3000 });
+            t.diagnostic(`Cached startup at ${basePath}: ${Date.now() - startupAt} ms (local Chromium, not iPhone)`);
+            await page.evaluate(() => window.restoreReadiness());
+
             online = false;
             server.setOnline(false);
             await context.setOffline(true);
