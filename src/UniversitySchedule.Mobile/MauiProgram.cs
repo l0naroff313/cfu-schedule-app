@@ -53,7 +53,7 @@ public static class MauiProgram
                 client.BaseAddress = apiOptions.BaseAddress;
             }
 
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("CFU-ElJournal/1.0.3");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("CFU-ElJournal/1.0.4");
             return new UniversityScheduleApiClient(
                 client,
                 apiOptions,
@@ -84,7 +84,7 @@ public static class MauiProgram
                 BaseAddress = new Uri(CfuScheduleRepository.BaseAddress),
                 Timeout = TimeSpan.FromSeconds(15),
             };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("CFU-ElJournal/1.0.3");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("CFU-ElJournal/1.0.4");
             return client;
         });
         builder.Services.AddSingleton<CfuScheduleRepository>();
