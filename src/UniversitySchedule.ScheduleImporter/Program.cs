@@ -16,6 +16,8 @@ builder.Services.AddSingleton<CfuScheduleSourceClient>();
 builder.Services.AddSingleton<VuzopediaSourceClient>();
 builder.Services.AddSingleton<ReferenceCatalogBuilder>();
 builder.Services.AddSingleton<ReferenceCatalogReader>();
+builder.Services.AddSingleton<ExcelScheduleImporter>();
+builder.Services.AddSingleton<ExcelScheduleWriter>();
 if (!options.SeedPostgreSql)
 {
     builder.Services.AddSingleton<IReferenceCatalogSink, ReferenceCatalogWriter>();

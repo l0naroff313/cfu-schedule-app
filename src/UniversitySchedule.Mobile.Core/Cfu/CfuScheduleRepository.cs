@@ -32,37 +32,70 @@ public sealed class CfuScheduleRepository
         NumberHandling = JsonNumberHandling.AllowReadingFromString,
     };
 
-    private readonly HttpClient _httpClient;
-    private readonly ILocalDataStore _localDataStore;
+	private readonly HttpClient _httpClient;
+	private readonly ILocalDataStore _localDataStore;
+	private readonly IManualScheduleOverrideProvider _manualScheduleOverrideProvider;
+	private ManualScheduleOverrideDocument? _manualScheduleOverride;
+	private bool _manualScheduleLoaded;
 
-    public CfuScheduleRepository(HttpClient httpClient, ILocalDataStore localDataStore)
-    {
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _localDataStore = localDataStore ?? throw new ArgumentNullException(nameof(localDataStore));
-    }
+	public CfuScheduleRepository(
+		HttpClient httpClient,
+		ILocalDataStore localDataStore,
+		IManualScheduleOverrideProvider? manualScheduleOverrideProvider = null)
+	{
+		_httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+		_localDataStore = localDataStore ?? throw new ArgumentNullException(nameof(localDataStore));
+		_manualScheduleOverrideProvider = manualScheduleOverrideProvider ?? EmptyManualScheduleOverrideProvider.Instance;
+	}
 
-    public async Task<CfuCatalogLoadResult> LoadCatalogAsync(
-        CancellationToken cancellationToken = default)
-    {
-        DocumentLoadResult<CfuScheduleIndexDocument> result = await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
-            IndexKey,
-            "index",
-            ValidateIndex,
-            cancellationToken);
-        return new CfuCatalogLoadResult(
-            CfuScheduleCatalogMapper.Map(result.Value),
-            result.UpdatedAtUtc,
-            result.IsFromCache);
-    }
+	public async Task<CfuCatalogLoadResult> LoadCatalogAsync(
+		CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			DocumentLoadResult<CfuScheduleIndexDocument> result = await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
+				IndexKey,
+				"index",
+				ValidateIndex,
+				cancellationToken);
+			return new CfuCatalogLoadResult(
+				CfuScheduleCatalogMapper.Map(result.Value),
+				result.UpdatedAtUtc,
+				result.IsFromCache);
+		}
+		catch (InvalidOperationException)
+		{
+			ManualScheduleOverrideDocument? manual = await LoadManualScheduleOverrideAsync(cancellationToken);
+			if (manual is null || manual.Bells.Count == 0 || manual.Tree.Count == 0)
+			{
+				throw;
+			}
+
+			return new CfuCatalogLoadResult(
+				CfuScheduleCatalogMapper.Map(manual.ToIndex()),
+				manual.ImportedAtUtc,
+				IsFromCache: true);
+		}
+	}
 
     public async Task<CfuScheduleLoadResult?> LoadCachedGroupScheduleAsync(
         string groupCode,
         int? subgroup = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(groupCode);
+		ArgumentException.ThrowIfNullOrWhiteSpace(groupCode);
 
-        LocalDocument? indexDocument = await _localDataStore.GetAsync(IndexKey, cancellationToken);
+		ManualScheduleOverrideDocument? manual = await LoadManualScheduleOverrideAsync(cancellationToken);
+		CfuGroupScheduleDocument? manualSchedule = manual?.FindGroup(groupCode);
+		if (manual is not null && manualSchedule is not null && manual.Bells.Count > 0)
+		{
+			return new CfuScheduleLoadResult(
+				CfuScheduleMapper.MapGroup(manual.ToIndex(), manualSchedule, subgroup),
+				manual.ImportedAtUtc,
+				IsFromCache: true);
+		}
+
+		LocalDocument? indexDocument = await _localDataStore.GetAsync(IndexKey, cancellationToken);
         LocalDocument? groupDocument = await _localDataStore.GetAsync(GroupKey(groupCode), cancellationToken);
         if (indexDocument is null || groupDocument is null)
         {
@@ -87,9 +120,34 @@ public sealed class CfuScheduleRepository
         int? subgroup = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(groupCode);
+		ArgumentException.ThrowIfNullOrWhiteSpace(groupCode);
 
-        DocumentLoadResult<CfuScheduleIndexDocument> index = await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
+		ManualScheduleOverrideDocument? manual = await LoadManualScheduleOverrideAsync(cancellationToken);
+		CfuGroupScheduleDocument? manualSchedule = manual?.FindGroup(groupCode);
+			if (manual is not null && manualSchedule is not null && manual.Bells.Count > 0)
+		{
+			CfuScheduleIndexDocument manualIndex;
+			try
+			{
+				manualIndex = (await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
+					IndexKey,
+					"index",
+					ValidateIndex,
+					cancellationToken)).Value;
+			}
+			catch (InvalidOperationException)
+			{
+				manualIndex = manual.ToIndex();
+			}
+			await SaveManualScheduleCacheAsync(manualIndex, manualSchedule, manual.ImportedAtUtc, cancellationToken);
+
+			return new CfuScheduleLoadResult(
+				CfuScheduleMapper.MapGroup(manualIndex, manualSchedule, subgroup),
+				manual.ImportedAtUtc,
+				IsFromCache: true);
+		}
+
+		DocumentLoadResult<CfuScheduleIndexDocument> index = await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
             IndexKey,
             "index",
             ValidateIndex,
@@ -115,10 +173,20 @@ public sealed class CfuScheduleRepository
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         string normalizedQuery = query.Trim();
-        if (normalizedQuery.Length < 2)
-        {
-            throw new ArgumentException("Teacher query must contain at least two characters.", nameof(query));
-        }
+		if (normalizedQuery.Length < 2)
+		{
+			throw new ArgumentException("Teacher query must contain at least two characters.", nameof(query));
+		}
+
+		ManualScheduleOverrideDocument? manual = await LoadManualScheduleOverrideAsync(cancellationToken);
+		IReadOnlyList<CfuLessonDocument> manualLessons = manual?.FindTeacherLessons(normalizedQuery) ?? [];
+		if (manual is not null && manualLessons.Count > 0 && manual.Bells.Count > 0)
+		{
+			return new CfuTeacherSearchLoadResult(
+				CfuScheduleMapper.MapTeacherSearch(manual.ToIndex(), manualLessons),
+				manual.ImportedAtUtc,
+				IsFromCache: true);
+		}
 
         DocumentLoadResult<CfuScheduleIndexDocument> index = await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
             IndexKey,
@@ -183,12 +251,55 @@ public sealed class CfuScheduleRepository
             IsFromCache: true);
     }
 
-    private static T Deserialize<T>(string content, Func<T, T> validate)
+	private static T Deserialize<T>(string content, Func<T, T> validate)
     {
         T value = JsonSerializer.Deserialize<T>(content, JsonOptions)
             ?? throw new InvalidDataException("CFU returned an empty JSON document.");
         return validate(value);
-    }
+	}
+
+	private async Task<ManualScheduleOverrideDocument?> LoadManualScheduleOverrideAsync(
+		CancellationToken cancellationToken)
+	{
+		if (_manualScheduleLoaded)
+		{
+			return _manualScheduleOverride;
+		}
+
+		_manualScheduleLoaded = true;
+		try
+		{
+			_manualScheduleOverride = await _manualScheduleOverrideProvider.LoadAsync(cancellationToken);
+		}
+		catch (HttpRequestException)
+		{
+			_manualScheduleOverride = null;
+		}
+		catch (JsonException)
+		{
+			_manualScheduleOverride = null;
+		}
+		catch (InvalidDataException)
+		{
+			_manualScheduleOverride = null;
+		}
+
+		return _manualScheduleOverride;
+	}
+
+	private async Task SaveManualScheduleCacheAsync(
+		CfuScheduleIndexDocument index,
+		CfuGroupScheduleDocument schedule,
+		DateTimeOffset updatedAtUtc,
+		CancellationToken cancellationToken)
+	{
+		await _localDataStore.SaveAsync(
+			new LocalDocument(IndexKey, JsonSerializer.Serialize(index, JsonOptions), updatedAtUtc),
+			cancellationToken);
+		await _localDataStore.SaveAsync(
+			new LocalDocument(GroupKey(schedule.Code), JsonSerializer.Serialize(schedule, JsonOptions), updatedAtUtc),
+			cancellationToken);
+	}
 
     private static CfuScheduleIndexDocument ValidateIndex(CfuScheduleIndexDocument index)
     {
@@ -234,8 +345,16 @@ public sealed class CfuScheduleRepository
             .Replace('ё', 'е');
     }
 
-    private sealed record DocumentLoadResult<T>(
-        T Value,
-        DateTimeOffset UpdatedAtUtc,
-        bool IsFromCache);
+	private sealed record DocumentLoadResult<T>(
+		T Value,
+		DateTimeOffset UpdatedAtUtc,
+		bool IsFromCache);
+
+	private sealed class EmptyManualScheduleOverrideProvider : IManualScheduleOverrideProvider
+	{
+		public static EmptyManualScheduleOverrideProvider Instance { get; } = new();
+
+		public Task<ManualScheduleOverrideDocument?> LoadAsync(CancellationToken cancellationToken = default) =>
+			Task.FromResult<ManualScheduleOverrideDocument?>(null);
+	}
 }

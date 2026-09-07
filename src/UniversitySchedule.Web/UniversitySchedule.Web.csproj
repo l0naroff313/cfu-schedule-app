@@ -26,6 +26,10 @@
              Condition="Exists('wwwroot\data\cfu-reference-catalog.json')"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="wwwroot\data\cfu-manual-schedule.json"
+             Condition="Exists('wwwroot\data\cfu-manual-schedule.json')"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
     <ServiceWorker Include="wwwroot\service-worker.js"
                    PublishedContent="wwwroot\service-worker.published.js" />
   </ItemGroup>
@@ -34,6 +38,10 @@
     <MakeDir Directories="wwwroot\data" />
     <Copy SourceFiles="..\UniversitySchedule.Mobile\Resources\Raw\cfu-reference-catalog.json"
           DestinationFiles="wwwroot\data\cfu-reference-catalog.json"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\UniversitySchedule.Mobile\Resources\Raw\cfu-manual-schedule.json"
+          DestinationFiles="wwwroot\data\cfu-manual-schedule.json"
+          Condition="Exists('..\UniversitySchedule.Mobile\Resources\Raw\cfu-manual-schedule.json')"
           SkipUnchangedFiles="true" />
   </Target>
 

@@ -114,7 +114,7 @@ for (const [browserName, browserType] of [['chromium', chromium], ['webkit', web
             await page.getByRole('navigation').getByRole('button', { name: 'Профиль', exact: true }).click();
             await page.locator('.offline-card button').click();
             await page.locator('.offline-card.ready').filter({ hasText: 'Готово' }).waitFor();
-            assert.match(await page.locator('.offline-card').innerText(), /Готово.*1 занятий/s);
+            assert.match(await page.locator('.offline-card').innerText(), /Готово.*\d+ занятий/s);
             const complete = await page.evaluate(() => cfuOffline.getStatus());
             assert.equal(complete.isReady, true);
             if (basePath === '/') assert.ok(server.redirects > 0, 'Exercise real Cloudflare-style index redirect');
@@ -149,7 +149,8 @@ for (const [browserName, browserType] of [['chromium', chromium], ['webkit', web
             const navigation = await page.evaluate(() => cfuOffline.getStatus());
             assert.equal(navigation.isReady, true);
             const cachedGroup = await page.evaluate(() => cfuStorage.getDocument('cfu:group:пи-б-о-252'));
-            assert.match(cachedGroup.content, /Алгоритмы/);
+            const cachedSchedule = JSON.parse(cachedGroup.content);
+            assert.ok(cachedSchedule.занятия.some(lesson => lesson.предмет === 'Компьютерные сети'));
             const missing = await page.evaluate(async () => {
                 try { await fetch('missing-test.wasm'); return 'unexpected response'; }
                 catch { return 'network error'; }

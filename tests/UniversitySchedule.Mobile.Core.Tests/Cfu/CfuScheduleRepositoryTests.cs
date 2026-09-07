@@ -75,6 +75,71 @@ public sealed class CfuScheduleRepositoryTests
         Assert.NotNull(await store.GetAsync("cfu:group:мат-б-о-251"));
     }
 
+    [Fact]
+    public async Task ExcelOverride_TakesPriorityForMatchingGroup()
+    {
+        var store = new InMemoryLocalDataStore();
+        var repository = new CfuScheduleRepository(
+            CreateClient(request => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    request.RequestUri!.PathAndQuery.EndsWith("index", StringComparison.Ordinal)
+                        ? IndexJson
+                        : GroupJson,
+                    Encoding.UTF8,
+                    "application/json"),
+            }),
+            store,
+            new StubManualScheduleOverrideProvider(new ManualScheduleOverrideDocument
+            {
+                ImportedAtUtc = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero),
+                Bells = [new CfuBellDocument { PairNumber = 1, StartsAt = "08:00", EndsAt = "09:30" }],
+                Weeks = new CfuWeeksDocument
+                {
+                    EvenWeekMondays = ["2026-09-07"],
+                    OddWeekMondays = ["2026-09-14"],
+                },
+                Groups = [new CfuGroupScheduleDocument
+                {
+                    Code = "МАТ-б-о-251",
+                    Lessons = [new CfuLessonDocument
+                    {
+                        GroupCode = "МАТ-б-о-251",
+                        Day = 1,
+                        PairNumber = 1,
+                        Parity = "четная",
+                        Subject = "Excel версия",
+                        LessonType = "ПЗ",
+                    }],
+                }],
+            }));
+
+        CfuScheduleLoadResult result = await repository.LoadGroupScheduleAsync("МАТ-б-о-251");
+
+        Assert.True(result.IsFromCache);
+        Assert.Equal("Excel версия", Assert.Single(result.Snapshot.Lessons).Subject);
+    }
+
+    [Fact]
+    public void ExcelOverride_TeacherSearchUsesExactSurname()
+    {
+        var document = new ManualScheduleOverrideDocument
+        {
+            Groups = [new CfuGroupScheduleDocument
+            {
+                Code = "МАТ-б-о-251",
+                Lessons = [new CfuLessonDocument
+                {
+                    GroupCode = "МАТ-б-о-251",
+                    Teachers = ["Зуев С.А."],
+                }],
+            }],
+        };
+
+        Assert.Single(document.FindTeacherLessons("Зуев"));
+        Assert.Empty(document.FindTeacherLessons("Зу"));
+    }
+
     private static HttpClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> response)
     {
         return new HttpClient(new StubHttpMessageHandler(response))
@@ -115,6 +180,16 @@ public sealed class CfuScheduleRepositoryTests
             cancellationToken.ThrowIfCancellationRequested();
             _documents[document.Key] = document;
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class StubManualScheduleOverrideProvider(ManualScheduleOverrideDocument document)
+        : IManualScheduleOverrideProvider
+    {
+        public Task<ManualScheduleOverrideDocument?> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<ManualScheduleOverrideDocument?>(document);
         }
     }
 }

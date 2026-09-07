@@ -5,6 +5,8 @@ namespace UniversitySchedule.ScheduleImporter;
 public sealed class Worker(
     ReferenceCatalogBuilder builder,
     ReferenceCatalogReader reader,
+    ExcelScheduleImporter excelScheduleImporter,
+    ExcelScheduleWriter excelScheduleWriter,
     IEnumerable<IReferenceCatalogSink> sinks,
     IEnumerable<IReferenceCatalogFailureSink> failureSinks,
     ImportOptions options,
@@ -16,16 +18,29 @@ public sealed class Worker(
         DateTimeOffset startedAtUtc = DateTimeOffset.UtcNow;
         try
         {
-            logger.LogInformation("Reference catalog import started");
-            ReferenceCatalogSnapshot snapshot = options.SeedPostgreSql
-                ? await reader.ReadAsync(stoppingToken)
-                : await builder.BuildAsync(stoppingToken);
-            foreach (IReferenceCatalogSink sink in sinks)
+            if (!string.IsNullOrWhiteSpace(options.ExcelPath))
             {
-                await sink.WriteAsync(snapshot, stoppingToken);
+                logger.LogInformation("Excel schedule import started from {Path}", options.ExcelPath);
+                ManualScheduleOverrideDocument parsed = excelScheduleImporter.Parse(options.ExcelPath!, options.AcademicYear);
+                await excelScheduleWriter.WriteAsync(parsed, stoppingToken);
+                logger.LogInformation(
+                    "Excel schedule import completed: {Groups} groups, {Lessons} lessons",
+                    parsed.Groups.Count,
+                    parsed.Groups.Sum(group => group.Lessons.Count));
             }
+            else
+            {
+                logger.LogInformation("Reference catalog import started");
+                ReferenceCatalogSnapshot snapshot = options.SeedPostgreSql
+                    ? await reader.ReadAsync(stoppingToken)
+                    : await builder.BuildAsync(stoppingToken);
+                foreach (IReferenceCatalogSink sink in sinks)
+                {
+                    await sink.WriteAsync(snapshot, stoppingToken);
+                }
 
-            logger.LogInformation("Reference catalog import completed");
+                logger.LogInformation("Reference catalog import completed");
+            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {

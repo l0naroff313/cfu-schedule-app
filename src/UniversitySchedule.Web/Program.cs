@@ -28,13 +28,16 @@ builder.Services.AddScoped<ISecureValueStore>(services => services.GetRequiredSe
 builder.Services.AddScoped<BrowserThemeService>();
 builder.Services.AddScoped<WebOfflineShellService>();
 builder.Services.AddScoped<IReferenceCatalogProvider, WebReferenceCatalogProvider>();
+builder.Services.AddScoped<IManualScheduleOverrideProvider>(services =>
+    new WebManualScheduleOverrideProvider(services.GetRequiredService<HttpClient>()));
 builder.Services.AddScoped(services => new CfuScheduleRepository(
     new HttpClient
     {
         BaseAddress = new Uri(CfuScheduleRepository.BaseAddress),
         Timeout = TimeSpan.FromSeconds(20),
     },
-    services.GetRequiredService<ILocalDataStore>()));
+        services.GetRequiredService<ILocalDataStore>(),
+        services.GetRequiredService<IManualScheduleOverrideProvider>()));
 builder.Services.AddScoped<AcademicProfileStore>();
 builder.Services.AddScoped<ScheduleSession>();
 builder.Services.AddScoped<DailyScheduleRefreshService>();

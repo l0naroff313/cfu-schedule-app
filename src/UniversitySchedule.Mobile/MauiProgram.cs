@@ -72,6 +72,7 @@ public static class MauiProgram
             services.GetRequiredService<PersonalDataSyncCoordinator>());
         builder.Services.AddSingleton<ConnectivitySyncService>();
         builder.Services.AddSingleton<IReferenceCatalogProvider, EmbeddedReferenceCatalogProvider>();
+        builder.Services.AddSingleton<IManualScheduleOverrideProvider, EmbeddedManualScheduleOverrideProvider>();
         builder.Services.AddSingleton<PersonalNoteStore>();
         builder.Services.AddSingleton<PersonalAssignmentStore>();
         builder.Services.AddSingleton<ThemeSettingsService>();

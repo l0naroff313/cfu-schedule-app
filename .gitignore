@@ -46,4 +46,5 @@ __pycache__/
 node_modules/
 *.py[cod]
 src/UniversitySchedule.Web/wwwroot/data/cfu-reference-catalog.json
+src/UniversitySchedule.Web/wwwroot/data/cfu-manual-schedule.json
 Directory.Build.local.props
