@@ -58,8 +58,12 @@ public sealed class CfuScheduleRepository
 				"index",
 				ValidateIndex,
 				cancellationToken);
+			ManualScheduleOverrideDocument? manual = await LoadManualScheduleOverrideAsync(cancellationToken);
+			CfuScheduleIndexDocument index = manual is null || manual.Tree.Count == 0
+				? result.Value
+				: MergeCatalogIndex(result.Value, manual);
 			return new CfuCatalogLoadResult(
-				CfuScheduleCatalogMapper.Map(result.Value),
+				CfuScheduleCatalogMapper.Map(index),
 				result.UpdatedAtUtc,
 				result.IsFromCache);
 		}
@@ -299,6 +303,70 @@ public sealed class CfuScheduleRepository
 		await _localDataStore.SaveAsync(
 			new LocalDocument(GroupKey(schedule.Code), JsonSerializer.Serialize(schedule, JsonOptions), updatedAtUtc),
 			cancellationToken);
+	}
+
+	private static CfuScheduleIndexDocument MergeCatalogIndex(
+		CfuScheduleIndexDocument official,
+		ManualScheduleOverrideDocument manual)
+	{
+		return new CfuScheduleIndexDocument
+		{
+			Bells = official.Bells.Count > 0 ? official.Bells : manual.Bells,
+			Weeks = official.Weeks.EvenWeekMondays.Count > 0 || official.Weeks.OddWeekMondays.Count > 0
+				? official.Weeks
+				: manual.Weeks,
+			CurrentWeek = official.CurrentWeek,
+			Tree = MergeTrees(official.Tree, manual.Tree),
+		};
+	}
+
+	private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>> MergeTrees(
+		IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>> official,
+		IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>> manual)
+	{
+		var merged = new Dictionary<string, Dictionary<string, Dictionary<string, HashSet<string>>>>(StringComparer.CurrentCultureIgnoreCase);
+		foreach (var source in new[] { official, manual })
+		{
+			foreach ((string instituteName, IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> directions) in source)
+			{
+				if (!merged.TryGetValue(instituteName, out Dictionary<string, Dictionary<string, HashSet<string>>>? institute))
+				{
+					institute = new Dictionary<string, Dictionary<string, HashSet<string>>>(StringComparer.CurrentCultureIgnoreCase);
+					merged[instituteName] = institute;
+				}
+
+				foreach ((string directionName, IReadOnlyDictionary<string, IReadOnlyList<string>> courses) in directions)
+				{
+					if (!institute.TryGetValue(directionName, out Dictionary<string, HashSet<string>>? direction))
+					{
+						direction = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+						institute[directionName] = direction;
+					}
+
+					foreach ((string courseName, IReadOnlyList<string> groups) in courses)
+					{
+						if (!direction.TryGetValue(courseName, out HashSet<string>? groupSet))
+						{
+							groupSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+							direction[courseName] = groupSet;
+						}
+
+						groupSet.UnionWith(groups.Where(group => !string.IsNullOrWhiteSpace(group)));
+					}
+				}
+			}
+		}
+
+		return merged.ToDictionary(
+			institute => institute.Key,
+			institute => (IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>)institute.Value.ToDictionary(
+				direction => direction.Key,
+				direction => (IReadOnlyDictionary<string, IReadOnlyList<string>>)direction.Value.ToDictionary(
+					course => course.Key,
+					course => (IReadOnlyList<string>)course.Value.OrderBy(group => group, StringComparer.CurrentCultureIgnoreCase).ToArray(),
+					StringComparer.OrdinalIgnoreCase),
+				StringComparer.CurrentCultureIgnoreCase),
+			StringComparer.CurrentCultureIgnoreCase);
 	}
 
     private static CfuScheduleIndexDocument ValidateIndex(CfuScheduleIndexDocument index)
