@@ -180,6 +180,10 @@ for (const [browserName, browserType] of [['chromium', chromium], ['webkit', web
             const cachedGroup = await page.evaluate(() => cfuStorage.getDocument('cfu:group:пи-б-о-252'));
             const cachedSchedule = JSON.parse(cachedGroup.content);
             assert.ok(cachedSchedule.занятия.some(lesson => lesson.предмет === 'Компьютерные сети'));
+            const packagedSchedule = JSON.parse(fs.readFileSync(path.join(site, 'data/cfu-manual-schedule.json'), 'utf8'));
+            assert.deepEqual(cachedSchedule.занятия,
+                packagedSchedule.groups.find(group => group.код === 'ПИ-б-о-252').занятия,
+                'The offline copy must contain the entire current Excel timetable, not stale or partial data');
             const missing = await page.evaluate(async () => {
                 try { await fetch('missing-test.wasm'); return 'unexpected response'; }
                 catch { return 'network error'; }

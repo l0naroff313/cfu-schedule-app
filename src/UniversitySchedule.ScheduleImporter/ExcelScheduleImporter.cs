@@ -55,12 +55,13 @@ public sealed partial class ExcelScheduleImporter
             var evenMondays = new HashSet<string>(StringComparer.Ordinal);
             var oddMondays = new HashSet<string>(StringComparer.Ordinal);
             var groups = new Dictionary<string, Dictionary<string, CfuLessonDocument>>(StringComparer.OrdinalIgnoreCase);
+            var groupCourses = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             foreach (string workbookPath in workbooks.OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
             {
                 foreach (SheetGrid sheet in XlsxReader.Read(workbookPath))
                 {
-                    ParseSheet(sheet, academicYear, evenMondays, oddMondays, groups);
+                    ParseSheet(sheet, academicYear, evenMondays, oddMondays, groups, groupCourses);
                 }
             }
 
@@ -77,12 +78,13 @@ public sealed partial class ExcelScheduleImporter
                 ImportedAtUtc = DateTimeOffset.UtcNow,
                 Bells = DefaultBells,
                 Weeks = new CfuWeeksDocument { EvenWeekMondays = even, OddWeekMondays = odd },
+                GroupCourses = groupCourses,
                 Groups = groups
                     .OrderBy(item => item.Key, StringComparer.CurrentCultureIgnoreCase)
                     .Select(item => new CfuGroupScheduleDocument
                     {
                         Code = item.Key,
-                        Lessons = item.Value.Values
+                        Lessons = ExpandStartDates(CollapseSharedSubgroups(item.Value.Values), even, odd, academicYear)
                             .OrderBy(lesson => lesson.Parity, StringComparer.OrdinalIgnoreCase)
                             .ThenBy(lesson => lesson.Day)
                             .ThenBy(lesson => lesson.PairNumber)
@@ -126,7 +128,8 @@ public sealed partial class ExcelScheduleImporter
         int academicYear,
         ISet<string> evenMondays,
         ISet<string> oddMondays,
-        IDictionary<string, Dictionary<string, CfuLessonDocument>> groups)
+        IDictionary<string, Dictionary<string, CfuLessonDocument>> groups,
+        IDictionary<string, int> groupCourses)
     {
         IReadOnlyList<int> blockStarts = Enumerable.Range(0, sheet.MaxColumn + 1)
             .Where(column => IsDayHeader(sheet.Get(2, column)))
@@ -157,6 +160,10 @@ public sealed partial class ExcelScheduleImporter
             {
                 continue;
             }
+
+            Match courseMatch = Regex.Match(sheet.Name, @"[1-6]");
+            if (courseMatch.Success)
+                foreach (GroupColumn column in columns) groupCourses[column.GroupCode] = int.Parse(courseMatch.Value);
 
             int? currentDay = null;
             for (int row = 4; row <= sheet.MaxRow; row++)
@@ -315,8 +322,9 @@ public sealed partial class ExcelScheduleImporter
         return day > 0;
     }
 
-    private static string NormalizeGroupCode(string value) =>
-        string.Concat(CleanText(value).Where(character => !char.IsWhiteSpace(character)));
+    internal static string NormalizeGroupCode(string value) =>
+        Regex.Replace(string.Concat(GroupPrefixRegex().Replace(CleanText(value), string.Empty)
+            .Where(character => !char.IsWhiteSpace(character))), @"-([оз])(\d{3})$", "-$1-$2");
 
     private static string NormalizeTeacher(string value)
     {
@@ -359,9 +367,9 @@ public sealed partial class ExcelScheduleImporter
         (value ?? string.Empty).Replace('\u00a0', ' ')
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
-    private static string LessonKey(CfuLessonDocument lesson) => string.Join('|',
+    private static string LessonKey(CfuLessonDocument lesson, bool includeSubgroup = true) => string.Join('|',
         lesson.GroupCode,
-        lesson.Subgroup.ToString(CultureInfo.InvariantCulture),
+        includeSubgroup ? lesson.Subgroup.ToString(CultureInfo.InvariantCulture) : string.Empty,
         lesson.Day.ToString(CultureInfo.InvariantCulture),
         lesson.PairNumber.ToString(CultureInfo.InvariantCulture),
         lesson.Parity,
@@ -370,6 +378,48 @@ public sealed partial class ExcelScheduleImporter
         string.Join(',', lesson.Teachers),
         lesson.Classroom,
         lesson.Building);
+
+    private static IEnumerable<CfuLessonDocument> CollapseSharedSubgroups(IEnumerable<CfuLessonDocument> lessons)
+    {
+        foreach (var group in lessons.GroupBy(lesson => LessonKey(lesson, includeSubgroup: false)))
+        {
+            if (group.Select(lesson => lesson.Subgroup).ToHashSet().SetEquals([1, 2]))
+                yield return CopyLesson(group.First(), subgroup: 0);
+            else
+                foreach (CfuLessonDocument lesson in group) yield return lesson;
+        }
+    }
+
+    private static IEnumerable<CfuLessonDocument> ExpandStartDates(IEnumerable<CfuLessonDocument> lessons,
+        string[] evenMondays, string[] oddMondays, int academicYear)
+    {
+        foreach (CfuLessonDocument lesson in lessons)
+        {
+            Match match = StartsOnRegex().Match(lesson.Subject);
+            if (!match.Success) { yield return lesson; continue; }
+            int year = match.Groups["year"].Success ? int.Parse(match.Groups["year"].Value) : academicYear;
+            var from = new DateOnly(year, int.Parse(match.Groups["month"].Value), int.Parse(match.Groups["day"].Value));
+            foreach (string monday in lesson.Parity == "нечетная" ? oddMondays : evenMondays)
+            {
+                DateOnly date = DateOnly.ParseExact(monday, "yyyy-MM-dd", CultureInfo.InvariantCulture).AddDays(lesson.Day - 1);
+                if (date >= from) yield return CopyLesson(lesson, lesson.Subgroup, date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            }
+        }
+    }
+
+    private static CfuLessonDocument CopyLesson(CfuLessonDocument lesson, int subgroup, string? date = null) => new()
+    {
+        GroupCode = lesson.GroupCode, Subgroup = subgroup, Day = lesson.Day, PairNumber = lesson.PairNumber,
+        Parity = lesson.Parity, Date = date ?? lesson.Date, Subject = lesson.Subject, LessonType = lesson.LessonType,
+        Teachers = lesson.Teachers, Classroom = lesson.Classroom, Building = lesson.Building,
+        Note = lesson.Note, Online = lesson.Online,
+    };
+
+    [GeneratedRegex(@"^группа\s*", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex GroupPrefixRegex();
+
+    [GeneratedRegex(@"(?:^|[/\s])с\s*(?<day>\d{1,2})\.(?<month>\d{1,2})(?:\.(?<year>\d{4}))?\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex StartsOnRegex();
 
     [GeneratedRegex(@"^(?<group>.+?)\s*\((?<subgroup>[12])\)$")]
     private static partial Regex GroupHeaderRegex();
@@ -389,15 +439,17 @@ public sealed partial class ExcelScheduleImporter
     {
         private readonly IReadOnlyDictionary<int, IReadOnlyDictionary<int, string>> _rows;
 
-        public SheetGrid(IReadOnlyDictionary<int, IReadOnlyDictionary<int, string>> rows, int maxRow, int maxColumn)
+        public SheetGrid(IReadOnlyDictionary<int, IReadOnlyDictionary<int, string>> rows, int maxRow, int maxColumn, string name)
         {
             _rows = rows;
             MaxRow = maxRow;
             MaxColumn = maxColumn;
+            Name = name;
         }
 
         public int MaxRow { get; }
         public int MaxColumn { get; }
+        public string Name { get; }
 
         public string Get(int row, int column) =>
             _rows.TryGetValue(row, out IReadOnlyDictionary<int, string>? values) &&
@@ -436,15 +488,15 @@ public sealed partial class ExcelScheduleImporter
                 }
 
                 XDocument worksheet = LoadXml(archive, target);
-                sheets.Add(ReadSheet(worksheet, sharedStrings));
+                sheets.Add(ReadSheet(worksheet, sharedStrings, sheet.Attribute("name")?.Value ?? string.Empty));
             }
 
             return sheets;
         }
 
-        private static SheetGrid ReadSheet(XDocument document, IReadOnlyDictionary<string, string> sharedStrings)
+        private static SheetGrid ReadSheet(XDocument document, IReadOnlyDictionary<string, string> sharedStrings, string name)
         {
-            var rows = new Dictionary<int, IReadOnlyDictionary<int, string>>();
+            var rows = new Dictionary<int, Dictionary<int, string>>();
             int maxRow = 0;
             int maxColumn = 0;
             foreach (XElement row in document.Root?.Element(SpreadsheetNamespace + "sheetData")?.Elements(SpreadsheetNamespace + "row") ?? [])
@@ -475,7 +527,20 @@ public sealed partial class ExcelScheduleImporter
                 maxRow = Math.Max(maxRow, rowNumber - 1);
             }
 
-            return new SheetGrid(rows, maxRow, maxColumn);
+            // Expand horizontal merged cells only on their anchor row. A vertically
+            // merged subject must not become its own teacher or classroom.
+            foreach (XElement merge in document.Root?.Element(SpreadsheetNamespace + "mergeCells")?.Elements(SpreadsheetNamespace + "mergeCell") ?? [])
+            {
+                string[] addresses = (merge.Attribute("ref")?.Value ?? string.Empty).Split(':');
+                if (addresses.Length != 2 || !TryParseColumn(addresses[0], out int start) ||
+                    !TryParseColumn(addresses[1], out int end) ||
+                    !int.TryParse(new string(addresses[0].Where(char.IsDigit).ToArray()), out int rowNumber) ||
+                    !rows.TryGetValue(rowNumber - 1, out var values) || !values.TryGetValue(start, out string? value)) continue;
+                for (int column = start + 1; column <= end; column++) values.TryAdd(column, value);
+                maxColumn = Math.Max(maxColumn, end);
+            }
+
+            return new SheetGrid(rows.ToDictionary(row => row.Key, row => (IReadOnlyDictionary<int, string>)row.Value), maxRow, maxColumn, name);
         }
 
         private static Dictionary<string, string> ReadSharedStrings(ZipArchive archive)
@@ -555,6 +620,9 @@ public sealed partial class ExcelScheduleImporter
 
 public sealed class ManualScheduleOverrideDocument
 {
+    [JsonPropertyName("groupCourses")]
+    public IReadOnlyDictionary<string, int> GroupCourses { get; init; } = new Dictionary<string, int>();
+
     [JsonPropertyName("sourceFile")]
     public string SourceFile { get; init; } = string.Empty;
 

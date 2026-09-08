@@ -12,7 +12,8 @@ public sealed record ImportOptions(
     string? ExcelPath = null,
     string? ManualScheduleOutputPath = null,
     string? CatalogInputPath = null,
-    int AcademicYear = 2026)
+    int AcademicYear = 2026,
+    bool ReplaceExcelGroups = false)
 {
     public static ImportOptions Parse(IReadOnlyList<string> args, string contentRoot)
     {
@@ -44,6 +45,7 @@ public sealed record ImportOptions(
         bool seedPostgreSql = false;
         double delaySeconds = 5;
         int academicYear = 2026;
+        bool replaceExcelGroups = false;
 
         for (int index = 0; index < args.Count; index++)
         {
@@ -82,6 +84,9 @@ public sealed record ImportOptions(
                 case "--excel":
                     excelPath = RequireValue(args, ref index, "--excel");
                     break;
+                case "--replace-excel-groups":
+                    replaceExcelGroups = true;
+                    break;
                 case "--manual-output":
                     manualScheduleOutputPath = RequireValue(args, ref index, "--manual-output");
                     break;
@@ -100,6 +105,9 @@ public sealed record ImportOptions(
             }
         }
 
+        if (replaceExcelGroups && excelPath is null)
+            throw new ArgumentException("--replace-excel-groups requires --excel.");
+
         return new ImportOptions(
             Path.GetFullPath(outputPath),
             Path.GetFullPath(reportsDirectory),
@@ -112,7 +120,8 @@ public sealed record ImportOptions(
             excelPath is null ? null : Path.GetFullPath(excelPath),
             Path.GetFullPath(manualScheduleOutputPath),
             Path.GetFullPath(catalogInputPath),
-            academicYear);
+            academicYear,
+            replaceExcelGroups);
     }
 
     private static string RequireValue(IReadOnlyList<string> args, ref int index, string option)

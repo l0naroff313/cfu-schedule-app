@@ -5,6 +5,15 @@ namespace UniversitySchedule.Importer.Tests;
 public sealed class ImportOptionsTests
 {
     [Fact]
+    public void Parse_ReplacementRequiresExplicitExcelSource()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "cfu-importer", "src");
+        Assert.Throws<ArgumentException>(() => ImportOptions.Parse(["--replace-excel-groups"], root));
+        Assert.True(ImportOptions.Parse(["--excel", "new.xlsx", "--replace-excel-groups"], root).ReplaceExcelGroups);
+        Assert.False(ImportOptions.Parse(["--excel", "new.xlsx"], root).ReplaceExcelGroups);
+    }
+
+    [Fact]
     public void Parse_SeedPostgresEnablesDatabasePublishingWithoutRefresh()
     {
         ImportOptions options = ImportOptions.Parse(

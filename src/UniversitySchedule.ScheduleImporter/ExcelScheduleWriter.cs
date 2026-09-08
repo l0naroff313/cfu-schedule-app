@@ -27,7 +27,7 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
         Directory.CreateDirectory(Path.GetDirectoryName(manualPath)!);
 
         ManualScheduleOverrideDocument? previous = await ReadManualScheduleAsync(manualPath, cancellationToken);
-        ManualScheduleOverrideDocument effective = MergeManualSchedules(previous, parsed);
+        ManualScheduleOverrideDocument effective = MergeManualSchedules(previous, parsed, options.ReplaceExcelGroups);
         ReferenceCatalogSnapshot? catalog = await ReadCatalogAsync(cancellationToken);
         ManualScheduleOverrideDocument output = new()
         {
@@ -36,7 +36,8 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
             Bells = effective.Bells,
             Weeks = effective.Weeks,
             Groups = effective.Groups,
-            Tree = BuildTree(catalog, effective.Groups),
+            GroupCourses = effective.GroupCourses,
+            Tree = BuildTree(catalog, effective.Groups, effective.GroupCourses, options.AcademicYear),
         };
 
         await WriteAtomicAsync(manualPath, JsonSerializer.Serialize(output, JsonOptions), cancellationToken);
@@ -49,7 +50,7 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
                 cancellationToken);
             await WriteAtomicAsync(
                 Path.Combine(options.ReportsDirectory, "excel-schedule-import.md"),
-                BuildReport(effective, merged),
+                BuildReport(effective, merged, parsed.Groups.Count, options.ReplaceExcelGroups),
                 cancellationToken);
         }
     }
@@ -69,7 +70,8 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
 
     private static ManualScheduleOverrideDocument MergeManualSchedules(
         ManualScheduleOverrideDocument? previous,
-        ManualScheduleOverrideDocument incoming)
+        ManualScheduleOverrideDocument incoming,
+        bool replaceGroups)
     {
         if (previous is null || previous.Groups.Count == 0)
         {
@@ -77,11 +79,13 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
         }
 
         var groups = previous.Groups
-            .ToDictionary(group => group.Code.Trim(), StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(group => ExcelScheduleImporter.NormalizeGroupCode(group.Code), StringComparer.OrdinalIgnoreCase);
+        var courses = previous.GroupCourses.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in incoming.GroupCourses) courses[pair.Key] = pair.Value;
         foreach (CfuGroupScheduleDocument incomingGroup in incoming.Groups)
         {
             string code = incomingGroup.Code.Trim();
-            if (!groups.TryGetValue(code, out CfuGroupScheduleDocument? previousGroup))
+            if (replaceGroups || !groups.TryGetValue(code, out CfuGroupScheduleDocument? previousGroup))
             {
                 groups[code] = incomingGroup;
                 continue;
@@ -114,6 +118,7 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
             ImportedAtUtc = incoming.ImportedAtUtc,
             Bells = incoming.Bells,
             Weeks = incoming.Weeks,
+            GroupCourses = courses,
             Groups = groups.Values
                 .OrderBy(group => group.Code, StringComparer.CurrentCultureIgnoreCase)
                 .ToArray(),
@@ -134,7 +139,9 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
 
     private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>> BuildTree(
         ReferenceCatalogSnapshot? catalog,
-        IReadOnlyList<CfuGroupScheduleDocument> groups)
+        IReadOnlyList<CfuGroupScheduleDocument> groups,
+        IReadOnlyDictionary<string, int> sourceCourses,
+        int academicYear)
     {
         var mutable = new Dictionary<string, Dictionary<string, Dictionary<string, HashSet<string>>>>(StringComparer.CurrentCultureIgnoreCase);
         if (catalog is not null)
@@ -145,7 +152,7 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
                 Dictionary<string, HashSet<string>> courses = GetOrAdd(directions, program.SourceDirectionName);
                 foreach (string group in program.Groups.Where(value => !string.IsNullOrWhiteSpace(value)))
                 {
-                    GetOrAdd(courses, InferCourse(group)).Add(group.Trim());
+                    GetOrAdd(courses, InferCourse(group, sourceCourses, academicYear)).Add(group.Trim());
                 }
             }
         }
@@ -161,9 +168,13 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
                 continue;
             }
 
-            Dictionary<string, Dictionary<string, HashSet<string>>> directions = GetOrAdd(mutable, "Excel импорт");
-            Dictionary<string, HashSet<string>> courses = GetOrAdd(directions, "99.99.99 Excel расписание");
-            GetOrAdd(courses, InferCourse(group.Code)).Add(group.Code.Trim());
+            // Reuse a unique known program with the same group prefix and study level.
+            AcademicProgramReference[] matches = catalog?.Programs.Where(program => program.Groups.Any(known =>
+                GroupPrefix(known) == GroupPrefix(group.Code))).ToArray() ?? [];
+            AcademicProgramReference? match = matches.Length == 1 ? matches[0] : null;
+            Dictionary<string, Dictionary<string, HashSet<string>>> directions = GetOrAdd(mutable, match?.InstituteName ?? "Excel импорт");
+            Dictionary<string, HashSet<string>> courses = GetOrAdd(directions, match?.SourceDirectionName ?? "99.99.99 Excel расписание");
+            GetOrAdd(courses, InferCourse(group.Code, sourceCourses, academicYear)).Add(group.Code.Trim());
         }
 
         return mutable.ToDictionary(
@@ -182,6 +193,7 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
         ReferenceCatalogSnapshot catalog,
         ManualScheduleOverrideDocument parsed)
     {
+        var overriddenGroups = parsed.Groups.Select(group => ExcelScheduleImporter.NormalizeGroupCode(group.Code)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var additions = new Dictionary<string, List<TeacherScheduleEntry>>(StringComparer.OrdinalIgnoreCase);
         foreach (CfuGroupScheduleDocument group in parsed.Groups)
         {
@@ -228,15 +240,23 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
         var matched = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (TeacherReference teacher in catalog.Teachers)
         {
+            // Replace all entries for overridden groups, including teachers removed by a substitution.
+            TeacherScheduleEntry[] retained = teacher.Schedule
+                .Where(entry => !overriddenGroups.Contains(ExcelScheduleImporter.NormalizeGroupCode(entry.GroupCode))).ToArray();
             if (!additions.TryGetValue(teacher.IdentityKey, out List<TeacherScheduleEntry>? extra) ||
                 existingByKey[teacher.IdentityKey].Length > 1)
             {
-                mergedTeachers.Add(teacher);
+                mergedTeachers.Add(teacher with
+                {
+                    Schedule = retained,
+                    MatchStatus = retained.Length == 0 && teacher.MatchStatus != TeacherScheduleMatchStatus.Ambiguous
+                        ? TeacherScheduleMatchStatus.NoPublishedSchedule : teacher.MatchStatus,
+                });
                 continue;
             }
 
             matched.Add(teacher.IdentityKey);
-            TeacherScheduleEntry[] schedule = teacher.Schedule
+            TeacherScheduleEntry[] schedule = retained
                 .Concat(extra)
                 .GroupBy(EntryKey, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First())
@@ -247,7 +267,8 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
             mergedTeachers.Add(teacher with
             {
                 Schedule = schedule,
-                MatchStatus = schedule.Length > 0 ? TeacherScheduleMatchStatus.Exact : teacher.MatchStatus,
+                MatchStatus = schedule.Length > 0 && teacher.MatchStatus != TeacherScheduleMatchStatus.ScheduleOnly
+                    ? TeacherScheduleMatchStatus.Exact : teacher.MatchStatus,
             });
         }
 
@@ -339,10 +360,16 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
         return value;
     }
 
-    private static string InferCourse(string groupCode)
+    private static string GroupPrefix(string groupCode) =>
+        string.Concat(ExcelScheduleImporter.NormalizeGroupCode(groupCode).Reverse().SkipWhile(char.IsDigit).Reverse()).ToLowerInvariant();
+
+    private static string InferCourse(string groupCode, IReadOnlyDictionary<string, int> sourceCourses, int academicYear)
     {
+        if (sourceCourses.TryGetValue(groupCode, out int course)) return course.ToString(CultureInfo.InvariantCulture);
         string digits = new(groupCode.Reverse().TakeWhile(char.IsDigit).Reverse().ToArray());
-        return digits.Length >= 3 ? digits[^3].ToString(CultureInfo.InvariantCulture) : "1";
+        return digits.Length == 3 && int.TryParse(digits[..2], out int admissionYear)
+            ? Math.Clamp(academicYear - (2000 + admissionYear) + 1, 1, 6).ToString(CultureInfo.InvariantCulture)
+            : "1";
     }
 
     private static string EntryKey(TeacherScheduleEntry entry) => string.Join('|',
@@ -367,7 +394,7 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
 
     private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static string BuildReport(ManualScheduleOverrideDocument parsed, ReferenceCatalogSnapshot merged)
+    private static string BuildReport(ManualScheduleOverrideDocument parsed, ReferenceCatalogSnapshot merged, int incomingGroups, bool replaceGroups)
     {
         int lessonCount = parsed.Groups.Sum(group => group.Lessons.Count);
         var builder = new StringBuilder();
@@ -376,8 +403,10 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
         builder.AppendLine($"Источник: `{parsed.SourceFile}`.");
         builder.AppendLine($"Дата импорта: {parsed.ImportedAtUtc:yyyy-MM-dd HH:mm} UTC.");
         builder.AppendLine();
-        builder.AppendLine($"- Обработано групп: {parsed.Groups.Count}");
-        builder.AppendLine($"- Импортировано строк занятий: {lessonCount}");
+        builder.AppendLine($"- Групп в новом источнике: {incomingGroups}");
+        builder.AppendLine($"- Всего групп в локальном расписании: {parsed.Groups.Count}");
+        builder.AppendLine($"- Режим: {(replaceGroups ? "полная замена расписания групп из нового источника" : "добавление и обновление отдельных строк")}");
+        builder.AppendLine($"- Всего записей занятий (недельные шаблоны и датированные занятия): {lessonCount}");
         builder.AppendLine($"- Преподавателей с расписанием после объединения: {merged.Statistics.TeachersWithScheduleCount}");
         builder.AppendLine();
         builder.AppendLine("Расписание из этого файла имеет приоритет над официальным источником для перечисленных групп. Для остальных групп приложение продолжает использовать официальный API КФУ.");
