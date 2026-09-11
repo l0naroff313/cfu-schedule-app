@@ -1,0 +1,13 @@
+<resources>
+    <style name="CfuWidgetMeta" parent="@android:style/Widget.TextView"><item name="android:textColor">#64748B</item><item name="android:textSize">11sp</item><item name="android:fontFamily">sans</item></style>
+    <style name="CfuWidgetTitle" parent="@android:style/Widget.TextView"><item name="android:textColor">#10243B</item><item name="android:textSize">17sp</item><item name="android:textStyle">bold</item><item name="android:ellipsize">marquee</item></style>
+    <style name="CfuWidgetSubtitle" parent="@android:style/Widget.TextView"><item name="android:textColor">#49637E</item><item name="android:textSize">11sp</item><item name="android:ellipsize">marquee</item></style>
+    <style name="CfuWidgetTime" parent="@android:style/Widget.TextView"><item name="android:textColor">#49637E</item><item name="android:textSize">12sp</item></style>
+    <style name="CfuWidgetRoom" parent="@android:style/Widget.TextView"><item name="android:textColor">#49637E</item><item name="android:textSize">11sp</item></style>
+    <style name="CfuWidgetDay" parent="@android:style/Widget.TextView"><item name="android:textColor">#10243B</item><item name="android:textSize">14sp</item><item name="android:textStyle">bold</item><item name="android:paddingTop">4dp</item><item name="android:paddingBottom">3dp</item></style>
+    <style name="CfuWidgetRow"><item name="android:gravity">center_vertical</item><item name="android:paddingTop">1dp</item><item name="android:paddingBottom">1dp</item></style>
+    <style name="CfuWidgetPair" parent="@android:style/Widget.TextView"><item name="android:textColor">#3D83FF</item><item name="android:textStyle">bold</item><item name="android:gravity">center</item><item name="android:textSize">13sp</item></style>
+    <style name="CfuWidgetSubject" parent="@android:style/Widget.TextView"><item name="android:textColor">#19324E</item><item name="android:textSize">11sp</item><item name="android:gravity">center_vertical</item><item name="android:ellipsize">marquee</item></style>
+    <style name="CfuWidgetNote" parent="@android:style/Widget.TextView"><item name="android:textColor">#FF5C63</item><item name="android:textSize">11sp</item><item name="android:gravity">center</item></style>
+    <style name="CfuWidgetRowMeta" parent="@android:style/Widget.TextView"><item name="android:textColor">#49637E</item><item name="android:textSize">9sp</item><item name="android:gravity">center</item><item name="android:maxLines">1</item><item name="android:ellipsize">end</item></style>
+</resources>

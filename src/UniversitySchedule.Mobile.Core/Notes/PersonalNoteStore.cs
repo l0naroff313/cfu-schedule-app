@@ -6,6 +6,7 @@ namespace UniversitySchedule.Mobile.Core.Notes;
 
 public sealed class PersonalNoteStore
 {
+    public event EventHandler? Changed;
     private const string StorageKey = "personal-notes:v1";
     private readonly ILocalDataStore _localDataStore;
     private readonly TimeProvider _timeProvider;
@@ -61,6 +62,7 @@ public sealed class PersonalNoteStore
             notes.Add(note);
             await SaveAllAsync(notes, now, cancellationToken);
             await _changeSink.NoteUpsertedAsync(note, cancellationToken);
+            Changed?.Invoke(this, EventArgs.Empty);
             return note;
         }
         finally
@@ -109,6 +111,7 @@ public sealed class PersonalNoteStore
             notes[index] = updated;
             await SaveAllAsync(notes, now, cancellationToken);
             await _changeSink.NoteUpsertedAsync(updated, cancellationToken);
+            Changed?.Invoke(this, EventArgs.Empty);
             return updated;
         }
         finally
@@ -134,6 +137,7 @@ public sealed class PersonalNoteStore
             DateTimeOffset now = _timeProvider.GetUtcNow();
             await SaveAllAsync(notes, now, cancellationToken);
             await _changeSink.NoteDeletedAsync(id, now, cancellationToken);
+            Changed?.Invoke(this, EventArgs.Empty);
             return true;
         }
         finally
@@ -181,6 +185,7 @@ public sealed class PersonalNoteStore
             }
 
             await SaveAllAsync(notes, _timeProvider.GetUtcNow(), cancellationToken);
+            Changed?.Invoke(this, EventArgs.Empty);
         }
         finally
         {
@@ -241,6 +246,7 @@ public sealed class PersonalNoteStore
             if (changedCount > 0)
             {
                 await SaveAllAsync(notes, _timeProvider.GetUtcNow(), cancellationToken);
+                Changed?.Invoke(this, EventArgs.Empty);
             }
 
             return changedCount;

@@ -44,7 +44,7 @@ builder.Services.AddScoped<DailyScheduleRefreshService>();
 builder.Services.AddScoped<InstallationIdentityService>();
 
 Uri? apiBaseAddress = TryGetHttpsUri(builder.Configuration["UniversityScheduleApi:BaseUrl"]);
-var apiOptions = new UniversityScheduleApiOptions(apiBaseAddress, "web", "1.0.7");
+var apiOptions = new UniversityScheduleApiOptions(apiBaseAddress, "web", "1.0.8");
 builder.Services.AddSingleton(apiOptions);
 builder.Services.AddScoped(services => new UniversityScheduleApiClient(
     new HttpClient

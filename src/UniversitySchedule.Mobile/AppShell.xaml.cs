@@ -18,6 +18,7 @@ public partial class AppShell : Shell
     private readonly PersonalDataSyncCoordinator _syncCoordinator;
     private readonly ConnectivitySyncService _connectivitySync;
     private readonly DailyScheduleRefreshService _dailyScheduleRefresh;
+    private readonly IWidgetDataPublisher _widgetDataPublisher;
     private readonly ILogger<AppShell> _logger;
     private bool _startupChecked;
     private bool _mainTabNavigationPending;
@@ -30,6 +31,7 @@ public partial class AppShell : Shell
         PersonalDataSyncCoordinator syncCoordinator,
         ConnectivitySyncService connectivitySync,
         DailyScheduleRefreshService dailyScheduleRefresh,
+        IWidgetDataPublisher widgetDataPublisher,
         ILogger<AppShell> logger)
     {
         _services = services;
@@ -38,6 +40,7 @@ public partial class AppShell : Shell
         _syncCoordinator = syncCoordinator;
         _connectivitySync = connectivitySync;
         _dailyScheduleRefresh = dailyScheduleRefresh;
+        _widgetDataPublisher = widgetDataPublisher;
         _logger = logger;
         InitializeComponent();
 
@@ -91,6 +94,7 @@ public partial class AppShell : Shell
         }
 
         await _scheduleSession.InitializeAsync();
+        await _widgetDataPublisher.PublishAsync();
         _dailyScheduleRefresh.Start();
         if (_scheduleSession.Profile is null)
         {

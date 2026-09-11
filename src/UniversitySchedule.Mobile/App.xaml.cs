@@ -10,15 +10,18 @@ public partial class App : Application
     private readonly AppShell _appShell;
     private readonly DailyScheduleRefreshService _dailyScheduleRefresh;
     private readonly ILogger<App> _logger;
+    private readonly IWidgetDataPublisher _widgetDataPublisher;
 
     public App(
         AppShell appShell,
         ThemeSettingsService themeSettings,
         DailyScheduleRefreshService dailyScheduleRefresh,
+        IWidgetDataPublisher widgetDataPublisher,
         ILogger<App> logger)
     {
         _appShell = appShell;
         _dailyScheduleRefresh = dailyScheduleRefresh;
+        _widgetDataPublisher = widgetDataPublisher;
         _logger = logger;
         InitializeComponent();
         themeSettings.ApplySavedTheme();
@@ -42,6 +45,7 @@ public partial class App : Application
         try
         {
             await _dailyScheduleRefresh.CheckNowAsync();
+            await _widgetDataPublisher.PublishAsync();
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
         {

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="@drawable/cfu_widget_background">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="3"
+        android:orientation="vertical">
+        <TextView android:id="@+id/widget_group" style="@style/CfuWidgetMeta" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="2" android:gravity="center_vertical" android:orientation="vertical">
+                <TextView android:id="@+id/widget_header_title" style="@style/CfuWidgetTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="marquee" android:focusable="true" android:focusableInTouchMode="true" android:marqueeRepeatLimit="1" android:scrollHorizontally="true" android:singleLine="true" android:freezesText="true" />
+                <TextView android:id="@+id/widget_header_subtitle" style="@style/CfuWidgetSubtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center_vertical" android:orientation="vertical">
+                <TextView android:id="@+id/widget_header_time" style="@style/CfuWidgetTime" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:maxLines="1" />
+                <TextView android:id="@+id/widget_header_classroom" style="@style/CfuWidgetRoom" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:maxLines="1" />
+            </LinearLayout>
+        </LinearLayout>
+        <ProgressBar android:id="@+id/widget_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="5dp" android:max="100" android:progressTint="#3D83FF" android:progressBackgroundTint="#27405A" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="4" android:orientation="vertical">
+        <TextView android:id="@+id/widget_day_label" style="@style/CfuWidgetDay" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="сегодня" android:maxLines="1" />
+        <LinearLayout android:id="@+id/widget_row_1" style="@style/CfuWidgetRow" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+            <TextView android:id="@+id/widget_pair_1" style="@style/CfuWidgetPair" android:layout_width="28dp" android:layout_height="match_parent" />
+            <TextView android:id="@+id/widget_subject_1" style="@style/CfuWidgetSubject" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="2" android:ellipsize="marquee" android:singleLine="true" />
+            <TextView android:id="@+id/widget_note_1" style="@style/CfuWidgetNote" android:layout_width="15dp" android:layout_height="match_parent" android:text="●" />
+            <TextView android:id="@+id/widget_time_1" style="@style/CfuWidgetRowMeta" android:layout_width="74dp" android:layout_height="match_parent" />
+            <TextView android:id="@+id/widget_room_1" style="@style/CfuWidgetRowMeta" android:layout_width="62dp" android:layout_height="match_parent" />
+        </LinearLayout>
+        <include layout="@layout/cfu_schedule_widget_row_2" />
+        <include layout="@layout/cfu_schedule_widget_row_3" />
+        <include layout="@layout/cfu_schedule_widget_row_4" />
+        <include layout="@layout/cfu_schedule_widget_row_5" />
+        <include layout="@layout/cfu_schedule_widget_row_6" />
+    </LinearLayout>
+</LinearLayout>

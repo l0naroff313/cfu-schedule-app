@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_row_5"
+    style="@style/CfuWidgetRow"
+    android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+    <TextView android:id="@+id/widget_pair_5" style="@style/CfuWidgetPair" android:layout_width="28dp" android:layout_height="match_parent" />
+    <TextView android:id="@+id/widget_subject_5" style="@style/CfuWidgetSubject" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="2" android:ellipsize="marquee" android:singleLine="true" />
+    <TextView android:id="@+id/widget_note_5" style="@style/CfuWidgetNote" android:layout_width="15dp" android:layout_height="match_parent" android:text="●" />
+    <TextView android:id="@+id/widget_time_5" style="@style/CfuWidgetRowMeta" android:layout_width="74dp" android:layout_height="match_parent" />
+    <TextView android:id="@+id/widget_room_5" style="@style/CfuWidgetRowMeta" android:layout_width="62dp" android:layout_height="match_parent" />
+</LinearLayout>
