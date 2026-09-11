@@ -114,9 +114,11 @@ else
     private string _assignmentSubject = string.Empty;
     private string _assignmentText = string.Empty;
     private string _assignmentDeadline = string.Empty;
+    private int? _assignmentReminderMinutesBefore;
     private PersonalAssignmentStatus _assignmentStatus;
     private Guid? _assignmentLessonId;
     private string? _editorError;
+    private string? _notificationScheduleKey;
 
     protected override async Task OnInitializedAsync()
     {
@@ -127,6 +129,27 @@ else
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         State.StartBackgroundServices();
+        if (State.IsInitialized)
+        {
+            string scheduleKey = string.Join('|', State.Assignments
+                .Where(assignment => assignment.Status != PersonalAssignmentStatus.Completed && assignment.DeadlineUtc.HasValue && assignment.ReminderMinutesBefore is > 0)
+                .OrderBy(assignment => assignment.Id)
+                .Select(assignment => $"{assignment.Id:N}:{assignment.DeadlineUtc:O}:{assignment.ReminderMinutesBefore}"));
+            if (!string.Equals(scheduleKey, _notificationScheduleKey, StringComparison.Ordinal))
+            {
+                _notificationScheduleKey = scheduleKey;
+                await JavaScript.InvokeVoidAsync("cfuNotifications.schedule", State.Assignments
+                    .Where(assignment => assignment.Status != PersonalAssignmentStatus.Completed && assignment.DeadlineUtc.HasValue && assignment.ReminderMinutesBefore is > 0)
+                    .Select(assignment => new
+                    {
+                        Id = assignment.Id,
+                        assignment.Subject,
+                        assignment.Text,
+                        TriggerAt = assignment.DeadlineUtc!.Value.AddMinutes(-assignment.ReminderMinutesBefore!.Value),
+                        Deadline = assignment.DeadlineUtc.Value,
+                    }));
+            }
+        }
         if (!State.IsInitialized || _swipeRegistrationId is not null || _isSwipeAttachmentPending || _isDisposed)
         {
             return;
@@ -571,6 +594,7 @@ else
                     <label><span>Связанная пара</span><select value="@(_assignmentLessonId?.ToString() ?? string.Empty)" @onchange="OnAssignmentLessonChanged"><option value="">Без привязки</option>@foreach (ScheduleLesson lesson in LessonOptions) { <option value="@lesson.Id">@LessonOptionText(lesson)</option> }</select></label>
                     <label><span>Что нужно сделать</span><textarea rows="5" placeholder="Опишите задание" @bind="_assignmentText" @bind:event="oninput"></textarea></label>
                     <label><span>Дедлайн</span><input type="datetime-local" value="@_assignmentDeadline" @onchange="eventArgs => _assignmentDeadline = eventArgs.Value?.ToString() ?? string.Empty" /></label>
+                    <label><span>Напоминание</span><select value="@(_assignmentReminderMinutesBefore?.ToString() ?? string.Empty)" @onchange="OnAssignmentReminderChanged"><option value="">Без напоминания</option><option value="5">За 5 минут</option><option value="10">За 10 минут</option><option value="15">За 15 минут</option><option value="30">За 30 минут</option><option value="60">За 1 час</option><option value="1440">За 1 день</option></select><small>Работает, пока PWA открыта. Для уведомлений в фоне потребуется Web Push.</small></label>
                     <label><span>Статус</span><select value="@((int)_assignmentStatus)" @onchange="OnAssignmentStatusChanged"><option value="0">Новое</option><option value="1">В работе</option><option value="2">Выполнено</option></select></label>
                 </div>
                 @if (!string.IsNullOrWhiteSpace(_editorError)) { <p class="field-error">@_editorError</p> }
@@ -722,6 +746,7 @@ else
         _assignmentText = assignment?.Text ?? string.Empty;
         _assignmentLessonId = assignment?.LessonId ?? lesson?.Id;
         _assignmentDeadline = assignment?.DeadlineUtc?.ToOffset(UniversityOffset).ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
+        _assignmentReminderMinutesBefore = assignment?.ReminderMinutesBefore;
         _assignmentStatus = assignment?.Status ?? PersonalAssignmentStatus.New;
         _assignmentEditorOpen = true;
     }
@@ -733,7 +758,21 @@ else
         _editorError = null;
         if (string.IsNullOrWhiteSpace(_assignmentText)) { _editorError = "Введите текст задания."; return; }
         DateTimeOffset? deadline = ParseDeadline(_assignmentDeadline);
-        await State.SaveAssignmentAsync(_editingAssignmentId, _assignmentSubject, _assignmentText, _assignmentLessonId, deadline, _assignmentStatus);
+        if (_assignmentReminderMinutesBefore is not null && deadline is null)
+        {
+            _editorError = "Сначала укажите дедлайн для напоминания.";
+            return;
+        }
+        if (_assignmentReminderMinutesBefore is not null)
+        {
+            string permission = await JavaScript.InvokeAsync<string>("cfuNotifications.requestPermission");
+            if (permission == "denied")
+            {
+                _editorError = "Уведомления запрещены в браузере. Разрешите их в настройках сайта.";
+                return;
+            }
+        }
+        await State.SaveAssignmentAsync(_editingAssignmentId, _assignmentSubject, _assignmentText, _assignmentLessonId, deadline, _assignmentStatus, _assignmentReminderMinutesBefore);
         _assignmentEditorOpen = false;
     }
 
@@ -754,6 +793,11 @@ else
     private void OnAssignmentStatusChanged(ChangeEventArgs args)
     {
         if (int.TryParse(args.Value?.ToString(), out int value) && Enum.IsDefined(typeof(PersonalAssignmentStatus), value)) _assignmentStatus = (PersonalAssignmentStatus)value;
+    }
+
+    private void OnAssignmentReminderChanged(ChangeEventArgs args)
+    {
+        _assignmentReminderMinutesBefore = int.TryParse(args.Value?.ToString(), out int value) ? value : null;
     }
 
     private static DateTimeOffset? ParseDeadline(string value)

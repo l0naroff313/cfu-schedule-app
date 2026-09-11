@@ -5,6 +5,7 @@ using UniversitySchedule.Mobile.Core.Catalog;
 using UniversitySchedule.Mobile.Core.Cfu;
 using UniversitySchedule.Mobile.Core.Identity;
 using UniversitySchedule.Mobile.Core.Notes;
+using UniversitySchedule.Mobile.Core.Notifications;
 using UniversitySchedule.Mobile.Core.Profiles;
 using UniversitySchedule.Mobile.Core.Scheduling;
 using UniversitySchedule.Mobile.Core.Sync;
@@ -53,7 +54,7 @@ public static class MauiProgram
                 client.BaseAddress = apiOptions.BaseAddress;
             }
 
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("CFU-ElJournal/1.0.8");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("CFU-ElJournal/1.0.9");
             return new UniversityScheduleApiClient(
                 client,
                 apiOptions,
@@ -84,7 +85,7 @@ public static class MauiProgram
                 BaseAddress = new Uri(CfuScheduleRepository.BaseAddress),
                 Timeout = TimeSpan.FromSeconds(15),
             };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("CFU-ElJournal/1.0.8");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("CFU-ElJournal/1.0.9");
             return client;
         });
         builder.Services.AddSingleton<CfuScheduleRepository>();
@@ -92,8 +93,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<DailyScheduleRefreshService>();
 #if ANDROID
         builder.Services.AddSingleton<IWidgetDataPublisher, MobileWidgetDataPublisher>();
+        builder.Services.AddSingleton<IAssignmentReminderScheduler, AndroidAssignmentReminderScheduler>();
 #else
         builder.Services.AddSingleton<IWidgetDataPublisher, NoopWidgetDataPublisher>();
+        builder.Services.AddSingleton<IAssignmentReminderScheduler, NoopAssignmentReminderScheduler>();
 #endif
         builder.Services.AddTransient<ProfileSetupViewModel>();
         builder.Services.AddTransient<TodayPageViewModel>();

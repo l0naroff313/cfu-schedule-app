@@ -18,6 +18,7 @@ public sealed record AssignmentListItem(
     string Text,
     string Subject,
     string DeadlineText,
+    string ReminderText,
     string StatusText,
     string CompletionGlyph,
     bool IsCompleted,
@@ -169,6 +170,7 @@ public sealed class AssignmentsPageViewModel : ObservableObject
             assignment.Text,
             assignment.Subject,
             FormatDeadline(assignment.DeadlineUtc),
+            assignment.ReminderText,
             assignment.Status switch
             {
                 PersonalAssignmentStatus.New => "Новое",

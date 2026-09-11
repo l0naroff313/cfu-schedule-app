@@ -12,6 +12,8 @@ public sealed class PersonalAssignmentStore
     private readonly IPersonalDataChangeSink _changeSink;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
+    public event EventHandler? Changed;
+
     public PersonalAssignmentStore(ILocalDataStore localDataStore, TimeProvider timeProvider)
         : this(localDataStore, timeProvider, NullPersonalDataChangeSink.Instance)
     {
@@ -47,6 +49,7 @@ public sealed class PersonalAssignmentStore
         Guid? lessonId = null,
         DateTimeOffset? deadlineUtc = null,
         PersonalAssignmentStatus status = PersonalAssignmentStatus.New,
+        int? reminderMinutesBefore = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
@@ -63,10 +66,12 @@ public sealed class PersonalAssignmentStore
                 deadlineUtc,
                 status,
                 now,
-                now);
+                now,
+                NormalizeReminder(reminderMinutesBefore));
             assignments.Add(assignment);
             await SaveAllAsync(assignments, now, cancellationToken);
             await _changeSink.AssignmentUpsertedAsync(assignment, cancellationToken);
+            Changed?.Invoke(this, EventArgs.Empty);
             return assignment;
         }
         finally
@@ -82,6 +87,7 @@ public sealed class PersonalAssignmentStore
         Guid? lessonId,
         DateTimeOffset? deadlineUtc,
         PersonalAssignmentStatus status,
+        int? reminderMinutesBefore = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
@@ -104,10 +110,12 @@ public sealed class PersonalAssignmentStore
                 DeadlineUtc = deadlineUtc,
                 Status = status,
                 UpdatedAtUtc = now,
+                ReminderMinutesBefore = NormalizeReminder(reminderMinutesBefore),
             };
             assignments[index] = updated;
             await SaveAllAsync(assignments, now, cancellationToken);
             await _changeSink.AssignmentUpsertedAsync(updated, cancellationToken);
+            Changed?.Invoke(this, EventArgs.Empty);
             return updated;
         }
         finally
@@ -131,6 +139,7 @@ public sealed class PersonalAssignmentStore
             DateTimeOffset now = _timeProvider.GetUtcNow();
             await SaveAllAsync(assignments, now, cancellationToken);
             await _changeSink.AssignmentDeletedAsync(id, now, cancellationToken);
+            Changed?.Invoke(this, EventArgs.Empty);
             return true;
         }
         finally
@@ -153,6 +162,7 @@ public sealed class PersonalAssignmentStore
             assignment.LessonId,
             assignment.DeadlineUtc,
             status,
+            assignment.ReminderMinutesBefore,
             cancellationToken);
     }
 
@@ -180,6 +190,7 @@ public sealed class PersonalAssignmentStore
             }
 
             await SaveAllAsync(assignments, _timeProvider.GetUtcNow(), cancellationToken);
+            Changed?.Invoke(this, EventArgs.Empty);
         }
         finally
         {
@@ -241,6 +252,7 @@ public sealed class PersonalAssignmentStore
             if (changedCount > 0)
             {
                 await SaveAllAsync(assignments, _timeProvider.GetUtcNow(), cancellationToken);
+                Changed?.Invoke(this, EventArgs.Empty);
             }
 
             return changedCount;
@@ -261,4 +273,7 @@ public sealed class PersonalAssignmentStore
 
     private static string NormalizeSubject(string value) =>
         string.IsNullOrWhiteSpace(value) ? "Без предмета" : value.Trim();
+
+    private static int? NormalizeReminder(int? value) =>
+        value is 5 or 10 or 15 or 30 or 60 or 1440 ? value : null;
 }

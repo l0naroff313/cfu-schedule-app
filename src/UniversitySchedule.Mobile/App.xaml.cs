@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using UniversitySchedule.Mobile.Core.Scheduling;
+using UniversitySchedule.Mobile.Core.Notifications;
 using UniversitySchedule.Mobile.Services;
 
 namespace UniversitySchedule.Mobile;
@@ -11,17 +12,20 @@ public partial class App : Application
     private readonly DailyScheduleRefreshService _dailyScheduleRefresh;
     private readonly ILogger<App> _logger;
     private readonly IWidgetDataPublisher _widgetDataPublisher;
+    private readonly IAssignmentReminderScheduler _assignmentReminderScheduler;
 
     public App(
         AppShell appShell,
         ThemeSettingsService themeSettings,
         DailyScheduleRefreshService dailyScheduleRefresh,
         IWidgetDataPublisher widgetDataPublisher,
+        IAssignmentReminderScheduler assignmentReminderScheduler,
         ILogger<App> logger)
     {
         _appShell = appShell;
         _dailyScheduleRefresh = dailyScheduleRefresh;
         _widgetDataPublisher = widgetDataPublisher;
+        _assignmentReminderScheduler = assignmentReminderScheduler;
         _logger = logger;
         InitializeComponent();
         themeSettings.ApplySavedTheme();
@@ -45,6 +49,7 @@ public partial class App : Application
         try
         {
             await _dailyScheduleRefresh.CheckNowAsync();
+            await _assignmentReminderScheduler.SynchronizeAsync();
             await _widgetDataPublisher.PublishAsync();
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)

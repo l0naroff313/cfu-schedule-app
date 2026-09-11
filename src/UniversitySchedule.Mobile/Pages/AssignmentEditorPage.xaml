@@ -67,6 +67,11 @@
                     </Border>
                 </Grid>
 
+                <Label Style="{StaticResource SecondaryText}" Text="Напоминание" />
+                <Border Style="{StaticResource InputBorder}">
+                    <Picker x:Name="ReminderPicker" Title="Выберите время напоминания" IsEnabled="False" />
+                </Border>
+
                 <Label Style="{StaticResource SecondaryText}" Text="Статус" />
                 <Border Style="{StaticResource InputBorder}">
                     <Picker x:Name="StatusPicker" Title="Выберите статус" />

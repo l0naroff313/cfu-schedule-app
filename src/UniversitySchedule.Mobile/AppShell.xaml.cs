@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using UniversitySchedule.Mobile.Core.Identity;
+using UniversitySchedule.Mobile.Core.Notifications;
 using UniversitySchedule.Mobile.Core.Scheduling;
 using UniversitySchedule.Mobile.Core.Sync;
 using UniversitySchedule.Mobile.Pages;
@@ -19,6 +20,7 @@ public partial class AppShell : Shell
     private readonly ConnectivitySyncService _connectivitySync;
     private readonly DailyScheduleRefreshService _dailyScheduleRefresh;
     private readonly IWidgetDataPublisher _widgetDataPublisher;
+    private readonly IAssignmentReminderScheduler _assignmentReminderScheduler;
     private readonly ILogger<AppShell> _logger;
     private bool _startupChecked;
     private bool _mainTabNavigationPending;
@@ -32,6 +34,7 @@ public partial class AppShell : Shell
         ConnectivitySyncService connectivitySync,
         DailyScheduleRefreshService dailyScheduleRefresh,
         IWidgetDataPublisher widgetDataPublisher,
+        IAssignmentReminderScheduler assignmentReminderScheduler,
         ILogger<AppShell> logger)
     {
         _services = services;
@@ -41,6 +44,7 @@ public partial class AppShell : Shell
         _connectivitySync = connectivitySync;
         _dailyScheduleRefresh = dailyScheduleRefresh;
         _widgetDataPublisher = widgetDataPublisher;
+        _assignmentReminderScheduler = assignmentReminderScheduler;
         _logger = logger;
         InitializeComponent();
 
@@ -94,6 +98,7 @@ public partial class AppShell : Shell
         }
 
         await _scheduleSession.InitializeAsync();
+        await _assignmentReminderScheduler.SynchronizeAsync();
         await _widgetDataPublisher.PublishAsync();
         _dailyScheduleRefresh.Start();
         if (_scheduleSession.Profile is null)

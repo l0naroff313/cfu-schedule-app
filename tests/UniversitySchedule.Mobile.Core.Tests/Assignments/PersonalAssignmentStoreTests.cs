@@ -37,6 +37,34 @@ public sealed class PersonalAssignmentStoreTests
         Assert.Empty(await store.GetAllAsync());
     }
 
+    [Fact]
+    public async Task Reminder_IsPersistedAndInvalidValueIsCleared()
+    {
+        var dataStore = new InMemoryLocalDataStore();
+        var clock = new FixedTimeProvider(new DateTimeOffset(2026, 8, 29, 12, 0, 0, TimeSpan.Zero));
+        var store = new PersonalAssignmentStore(dataStore, clock);
+        DateTimeOffset deadline = clock.GetUtcNow().AddDays(1);
+
+        PersonalAssignment created = await store.AddAsync(
+            "Математика",
+            "Повторить тему",
+            deadlineUtc: deadline,
+            reminderMinutesBefore: 15);
+        Assert.Equal(15, created.ReminderMinutesBefore);
+        Assert.Equal("За 15 минут", created.ReminderText);
+
+        PersonalAssignment updated = await store.UpdateAsync(
+            created.Id,
+            created.Subject,
+            created.Text,
+            created.LessonId,
+            deadline,
+            created.Status,
+            reminderMinutesBefore: 99);
+        Assert.Null(updated.ReminderMinutesBefore);
+        Assert.Equal("Без напоминания", updated.ReminderText);
+    }
+
     private sealed class InMemoryLocalDataStore : ILocalDataStore
     {
         private readonly Dictionary<string, LocalDocument> _documents = [];

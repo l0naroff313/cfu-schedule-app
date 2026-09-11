@@ -74,6 +74,47 @@
         isStandalone: () => matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
     };
 
+    const notificationTimers = new Map();
+    const notificationTimerLimit = 2147483647;
+
+    function armNotification(item) {
+        const triggerAt = new Date(item.triggerAt).getTime();
+        if (!Number.isFinite(triggerAt)) return;
+        const delay = triggerAt - Date.now();
+        if (delay <= 0) return;
+        const timer = setTimeout(() => {
+            notificationTimers.delete(item.id);
+            if (delay > notificationTimerLimit) {
+                armNotification(item);
+                return;
+            }
+            if (Notification.permission !== 'granted') return;
+            const deadline = new Date(item.deadline).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
+            new Notification(`Дедлайн: ${item.subject || 'Домашнее задание'}`, {
+                body: `${item.text} • дедлайн ${deadline}`,
+                tag: `cfu-assignment-${item.id}`,
+                renotify: true,
+            });
+        }, Math.min(delay, notificationTimerLimit));
+        notificationTimers.set(item.id, timer);
+    }
+
+    window.cfuNotifications = {
+        requestPermission: async () => {
+            if (!('Notification' in window)) return 'unsupported';
+            return await Notification.requestPermission();
+        },
+        schedule: items => {
+            for (const timer of notificationTimers.values()) clearTimeout(timer);
+            notificationTimers.clear();
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            for (const item of (items || [])) {
+                if (!item?.id) item.id = `${item.subject || ''}:${item.deadline || ''}`;
+                armNotification(item);
+            }
+        }
+    };
+
     function emptyOfflineStatus(error = null) {
         return {
             isSupported: 'serviceWorker' in navigator && 'caches' in window,

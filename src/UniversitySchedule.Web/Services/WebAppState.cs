@@ -524,6 +524,7 @@ public sealed class WebAppState(
         Guid? lessonId,
         DateTimeOffset? deadlineUtc,
         PersonalAssignmentStatus status,
+        int? reminderMinutesBefore = null,
         CancellationToken cancellationToken = default)
     {
         if (id is Guid assignmentId)
@@ -535,11 +536,12 @@ public sealed class WebAppState(
                 lessonId,
                 deadlineUtc,
                 status,
+                reminderMinutesBefore,
                 cancellationToken);
         }
         else
         {
-            await assignmentStore.AddAsync(subject, text, lessonId, deadlineUtc, status, cancellationToken);
+            await assignmentStore.AddAsync(subject, text, lessonId, deadlineUtc, status, reminderMinutesBefore, cancellationToken);
         }
 
         await ReloadPersonalDataAsync(cancellationToken);

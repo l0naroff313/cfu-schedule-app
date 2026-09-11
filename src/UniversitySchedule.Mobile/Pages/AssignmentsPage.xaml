@@ -114,6 +114,7 @@
                                                 </DataTrigger>
                                             </Label.Triggers>
                                         </Label>
+                                        <Label HorizontalTextAlignment="End" Style="{StaticResource SecondaryText}" Text="{Binding ReminderText}" />
                                         <Label HorizontalTextAlignment="End" Style="{StaticResource SecondaryText}" Text="{Binding StatusText}" />
                                         <Button
                                             CommandParameter="{Binding Id}"

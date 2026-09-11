@@ -19,6 +19,8 @@ public partial class AssignmentEditorPage : ContentPage
         InitializeComponent();
         StatusPicker.ItemsSource = AssignmentStatusOption.All.ToList();
         StatusPicker.SelectedIndex = 0;
+        ReminderPicker.ItemsSource = ReminderOption.All.ToList();
+        ReminderPicker.SelectedIndex = 0;
         DeadlineDatePicker.Date = DateTime.Today.AddDays(1);
         DeadlineTimePicker.Time = new TimeSpan(23, 59, 0);
     }
@@ -70,6 +72,8 @@ public partial class AssignmentEditorPage : ContentPage
                 DeadlineDatePicker.Date = local.Date;
                 DeadlineTimePicker.Time = local.TimeOfDay;
             }
+            ReminderPicker.SelectedItem = ReminderOption.All.FirstOrDefault(option =>
+                option.Value == assignment.ReminderMinutesBefore) ?? ReminderOption.All[0];
         }
 
         LessonPicker.ItemsSource = lessons;
@@ -124,6 +128,9 @@ public partial class AssignmentEditorPage : ContentPage
         AssignmentStatusOption status = StatusPicker.SelectedItem as AssignmentStatusOption
             ?? AssignmentStatusOption.All[0];
         DateTimeOffset? deadlineUtc = BuildDeadlineUtc();
+        int? reminderMinutesBefore = deadlineUtc is null
+            ? null
+            : (ReminderPicker.SelectedItem as ReminderOption)?.Value;
         if (_assignmentId is Guid id)
         {
             await _store.UpdateAsync(
@@ -132,7 +139,8 @@ public partial class AssignmentEditorPage : ContentPage
                 TextEditor.Text,
                 lesson?.LessonId,
                 deadlineUtc,
-                status.Value);
+                status.Value,
+                reminderMinutesBefore);
         }
         else
         {
@@ -141,7 +149,8 @@ public partial class AssignmentEditorPage : ContentPage
                 TextEditor.Text,
                 lesson?.LessonId,
                 deadlineUtc,
-                status.Value);
+                status.Value,
+                reminderMinutesBefore);
         }
 
         await Navigation.PopModalAsync();
@@ -168,6 +177,7 @@ public partial class AssignmentEditorPage : ContentPage
     {
         DeadlineDatePicker.IsEnabled = UseDeadlineSwitch.IsToggled;
         DeadlineTimePicker.IsEnabled = UseDeadlineSwitch.IsToggled;
+        ReminderPicker.IsEnabled = UseDeadlineSwitch.IsToggled;
     }
 
     private DateTimeOffset? BuildDeadlineUtc()
@@ -191,6 +201,22 @@ public partial class AssignmentEditorPage : ContentPage
             new("Новое", PersonalAssignmentStatus.New),
             new("В работе", PersonalAssignmentStatus.InProgress),
             new("Выполнено", PersonalAssignmentStatus.Completed),
+        ];
+
+        public override string ToString() => Name;
+    }
+
+    private sealed record ReminderOption(string Name, int? Value)
+    {
+        public static IReadOnlyList<ReminderOption> All { get; } =
+        [
+            new("Без напоминания", null),
+            new("За 5 минут", 5),
+            new("За 10 минут", 10),
+            new("За 15 минут", 15),
+            new("За 30 минут", 30),
+            new("За 1 час", 60),
+            new("За 1 день", 1440),
         ];
 
         public override string ToString() => Name;
