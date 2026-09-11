@@ -60,6 +60,7 @@ public sealed class CfuGroupScheduleDocument
     public string Code { get; init; } = string.Empty;
 
     [JsonPropertyName("занятия")]
+    [JsonRequired]
     public IReadOnlyList<CfuLessonDocument> Lessons { get; init; } = [];
 
     [JsonPropertyName("fak")]

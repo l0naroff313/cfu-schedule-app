@@ -7,6 +7,7 @@ public sealed class Worker(
     ReferenceCatalogReader reader,
     ExcelScheduleImporter excelScheduleImporter,
     ExcelScheduleWriter excelScheduleWriter,
+    Sources.CfuScheduleSourceClient officialSource,
     IEnumerable<IReferenceCatalogSink> sinks,
     IEnumerable<IReferenceCatalogFailureSink> failureSinks,
     ImportOptions options,
@@ -18,7 +19,14 @@ public sealed class Worker(
         DateTimeOffset startedAtUtc = DateTimeOffset.UtcNow;
         try
         {
-            if (!string.IsNullOrWhiteSpace(options.ExcelPath))
+            if (options.OfficialSchedule)
+            {
+                var index = await officialSource.LoadIndexAsync(stoppingToken);
+                var groups = await officialSource.LoadGroupSchedulesAsync(index, stoppingToken);
+                await excelScheduleWriter.WriteOfficialAsync(index, groups.Select(group => group.Schedule).ToArray(), stoppingToken);
+                logger.LogInformation("Official offline snapshot published: {Count} groups; API remains primary", groups.Count);
+            }
+            else if (!string.IsNullOrWhiteSpace(options.ExcelPath))
             {
                 logger.LogInformation("Excel schedule import started from {Path}", options.ExcelPath);
                 ManualScheduleOverrideDocument parsed = excelScheduleImporter.Parse(options.ExcelPath!, options.AcademicYear);

@@ -2,16 +2,19 @@ namespace UniversitySchedule.Mobile.Core.Scheduling;
 
 public static class DailyScheduleRefreshPolicy
 {
-    public static readonly TimeSpan RefreshTime = TimeSpan.FromHours(4);
+    public static readonly TimeSpan RefreshTime = TimeSpan.FromHours(6);
+
+    // University time, independent of the device's time zone (including PWA/WASM).
+    public static readonly TimeZoneInfo MoscowTimeZone = TimeZoneInfo.CreateCustomTimeZone(
+        "CFU-Moscow", TimeSpan.FromHours(3), "Москва (UTC+03:00)", "Москва (UTC+03:00)");
 
     public static readonly TimeSpan RetryDelay = TimeSpan.FromMinutes(15);
 
     public static bool IsDue(
         DateTimeOffset nowUtc,
-        DateTimeOffset? lastNetworkRefreshUtc,
-        TimeZoneInfo timeZone)
+        DateTimeOffset? lastNetworkRefreshUtc)
     {
-        ArgumentNullException.ThrowIfNull(timeZone);
+        TimeZoneInfo timeZone = MoscowTimeZone;
 
         DateTime localNow = TimeZoneInfo.ConvertTime(nowUtc, timeZone).DateTime;
         if (localNow.TimeOfDay < RefreshTime)
@@ -26,12 +29,11 @@ public static class DailyScheduleRefreshPolicy
     public static TimeSpan GetDelayUntilNextCheck(
         DateTimeOffset nowUtc,
         DateTimeOffset? lastNetworkRefreshUtc,
-        TimeZoneInfo timeZone,
         bool hasProfile)
     {
-        ArgumentNullException.ThrowIfNull(timeZone);
+        TimeZoneInfo timeZone = MoscowTimeZone;
 
-        if (hasProfile && IsDue(nowUtc, lastNetworkRefreshUtc, timeZone))
+        if (hasProfile && IsDue(nowUtc, lastNetworkRefreshUtc))
         {
             return RetryDelay;
         }

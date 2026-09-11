@@ -4,6 +4,22 @@ namespace UniversitySchedule.Mobile.Core.Tests.Cfu;
 
 public sealed class CfuScheduleMapperTests
 {
+    [Theory]
+    [InlineData("с 14.09", 1)]
+    [InlineData("с 14.09.2026", 1)]
+    [InlineData("с конца сентября", 2)]
+    public void OfficialStartNote_FiltersOnlyUnambiguousDates(string note, int count)
+    {
+        var result = CfuScheduleMapper.MapGroup(CreateIndex(), new CfuGroupScheduleDocument
+        {
+            Code = "МАТ-б-о-251",
+            Lessons = [new CfuLessonDocument { GroupCode = "МАТ-б-о-251", Subject = "Электив",
+                Day = 1, PairNumber = 1, Parity = "обе", Note = note }],
+        });
+        Assert.Equal(count, result.Lessons.Count);
+        if (count == 1) Assert.Equal(new DateOnly(2026, 9, 14), result.Lessons[0].Date);
+    }
+
     [Fact]
     public void GroupSchedule_ExpandsParityAndFiltersSubgroup()
     {

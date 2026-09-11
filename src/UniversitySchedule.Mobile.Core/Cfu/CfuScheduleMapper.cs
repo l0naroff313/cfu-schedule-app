@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using UniversitySchedule.Contracts.Catalog;
 using UniversitySchedule.Contracts.Schedule;
 
@@ -240,8 +241,26 @@ public static class CfuScheduleMapper
             _ => [],
         };
 
+        DateOnly? notBefore = null;
+        Match start = Regex.Match(lesson.Note ?? string.Empty,
+            @"^\s*с\s+(?<date>\d{1,2}\.\d{1,2}(?:\.\d{4})?)\s*[.;]?\s*$", RegexOptions.IgnoreCase);
+        DateOnly[] semester = evenMondays.Concat(oddMondays).Order().ToArray();
+        if (start.Success && semester.Length > 0)
+        {
+            string value = start.Groups["date"].Value;
+            if (value.Count(character => character == '.') == 1)
+            {
+                int month = int.Parse(value.Split('.')[1], CultureInfo.InvariantCulture);
+                int year = semester[0].Year + (month < semester[0].Month ? 1 : 0);
+                value += $".{year}";
+            }
+            if (DateOnly.TryParseExact(value, ["d.M.yyyy", "dd.MM.yyyy"], CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out DateOnly from)) notBefore = from;
+        }
+
         return mondays
             .Select(monday => monday.AddDays(lesson.Day - 1))
+            .Where(date => notBefore is null || date >= notBefore.Value)
             .Distinct();
     }
 

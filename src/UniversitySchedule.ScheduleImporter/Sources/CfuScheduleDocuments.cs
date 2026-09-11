@@ -4,6 +4,9 @@ namespace UniversitySchedule.ScheduleImporter.Sources;
 
 public sealed class CfuScheduleIndexDocument
 {
+    [JsonPropertyName("now")]
+    public CfuCurrentWeekDocument CurrentWeek { get; init; } = new();
+
     [JsonPropertyName("bells")]
     public IReadOnlyList<CfuBellDocument> Bells { get; init; } = [];
 
@@ -13,6 +16,18 @@ public sealed class CfuScheduleIndexDocument
     [JsonPropertyName("tree")]
     public IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>> Tree { get; init; }
         = new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>>();
+}
+
+public sealed class CfuCurrentWeekDocument
+{
+    [JsonPropertyName("parity")]
+    public string Parity { get; init; } = string.Empty;
+    [JsonPropertyName("manual")]
+    public bool IsManual { get; init; }
+    [JsonPropertyName("mon")]
+    public string Monday { get; init; } = string.Empty;
+    [JsonPropertyName("note")]
+    public string? Note { get; init; }
 }
 
 public sealed class CfuBellDocument
@@ -42,6 +57,7 @@ public sealed class CfuGroupScheduleDocument
     public string Code { get; init; } = string.Empty;
 
     [JsonPropertyName("занятия")]
+    [JsonRequired]
     public IReadOnlyList<CfuLessonDocument> Lessons { get; init; } = [];
 
     [JsonPropertyName("fak")]

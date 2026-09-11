@@ -5,6 +5,17 @@ namespace UniversitySchedule.Importer.Tests;
 public sealed class ImportOptionsTests
 {
     [Fact]
+    public void OfficialSnapshot_AlwaysDownloadsFreshData_AndRejectsMixedSources()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "cfu-importer", "src");
+        var options = ImportOptions.Parse(["--official-schedule"], root);
+        Assert.True(options.OfficialSchedule);
+        Assert.True(options.Refresh);
+        Assert.Throws<ArgumentException>(() => ImportOptions.Parse(["--official-schedule", "--excel", "new.xlsx"], root));
+        Assert.Throws<ArgumentException>(() => ImportOptions.Parse(["--official-schedule", "--seed-postgres"], root));
+    }
+
+    [Fact]
     public void Parse_ReplacementRequiresExplicitExcelSource()
     {
         string root = Path.Combine(Path.GetTempPath(), "cfu-importer", "src");

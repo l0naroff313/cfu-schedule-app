@@ -41,7 +41,7 @@ public sealed class CfuScheduleSourceClient(
         CfuScheduleIndexDocument index,
         CancellationToken cancellationToken)
     {
-        CfuGroupSource[] groups = EnumerateGroups(index).ToArray();
+        CfuGroupSource[] groups = EnumerateGroups(index).DistinctBy(group => group.GroupCode, StringComparer.OrdinalIgnoreCase).ToArray();
         var schedules = new ConcurrentBag<CfuGroupScheduleSource>();
         int completed = 0;
 

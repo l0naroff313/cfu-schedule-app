@@ -13,7 +13,8 @@ public sealed record ImportOptions(
     string? ManualScheduleOutputPath = null,
     string? CatalogInputPath = null,
     int AcademicYear = 2026,
-    bool ReplaceExcelGroups = false)
+    bool ReplaceExcelGroups = false,
+    bool OfficialSchedule = false)
 {
     public static ImportOptions Parse(IReadOnlyList<string> args, string contentRoot)
     {
@@ -46,6 +47,7 @@ public sealed record ImportOptions(
         double delaySeconds = 5;
         int academicYear = 2026;
         bool replaceExcelGroups = false;
+        bool officialSchedule = false;
 
         for (int index = 0; index < args.Count; index++)
         {
@@ -61,6 +63,10 @@ public sealed record ImportOptions(
                     cacheDirectory = RequireValue(args, ref index, "--cache");
                     break;
                 case "--refresh":
+                    refresh = true;
+                    break;
+                case "--official-schedule":
+                    officialSchedule = true;
                     refresh = true;
                     break;
                 case "--skip-teacher-details":
@@ -107,6 +113,8 @@ public sealed record ImportOptions(
 
         if (replaceExcelGroups && excelPath is null)
             throw new ArgumentException("--replace-excel-groups requires --excel.");
+        if (officialSchedule && (excelPath is not null || publishPostgreSql))
+            throw new ArgumentException("--official-schedule cannot be combined with Excel or PostgreSQL import.");
 
         return new ImportOptions(
             Path.GetFullPath(outputPath),
@@ -121,7 +129,8 @@ public sealed record ImportOptions(
             Path.GetFullPath(manualScheduleOutputPath),
             Path.GetFullPath(catalogInputPath),
             academicYear,
-            replaceExcelGroups);
+            replaceExcelGroups,
+            officialSchedule);
     }
 
     private static string RequireValue(IReadOnlyList<string> args, ref int index, string option)

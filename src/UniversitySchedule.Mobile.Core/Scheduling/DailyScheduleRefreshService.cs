@@ -70,8 +70,7 @@ public sealed class DailyScheduleRefreshService(
 
     private bool IsDue() => DailyScheduleRefreshPolicy.IsDue(
         _timeProvider.GetUtcNow(),
-        _scheduleSession.LastNetworkRefreshAtUtc,
-        _timeProvider.LocalTimeZone);
+        _scheduleSession.LastNetworkRefreshAtUtc);
 
     private async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -103,7 +102,6 @@ public sealed class DailyScheduleRefreshService(
             TimeSpan delay = DailyScheduleRefreshPolicy.GetDelayUntilNextCheck(
                 _timeProvider.GetUtcNow(),
                 _scheduleSession.LastNetworkRefreshAtUtc,
-                _timeProvider.LocalTimeZone,
                 _scheduleSession.Profile is not null);
 
             try

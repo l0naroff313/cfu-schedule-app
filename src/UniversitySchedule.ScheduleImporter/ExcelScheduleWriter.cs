@@ -55,6 +55,39 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
         }
     }
 
+    public async Task WriteOfficialAsync(CfuScheduleIndexDocument index,
+        IReadOnlyList<CfuGroupScheduleDocument> groups, CancellationToken cancellationToken = default)
+    {
+        string[] expected = CfuScheduleSourceClient.EnumerateGroups(index)
+            .Select(group => group.GroupCode).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (expected.Length == 0 || index.Bells.Count == 0 || groups.Count != expected.Length ||
+            !expected.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(groups.Select(group => group.Code)) ||
+            groups.Any(group => group.Lessons is null))
+            throw new InvalidDataException("Incomplete official snapshot; previous output preserved.");
+
+        ReferenceCatalogSnapshot catalog = await ReadCatalogAsync(cancellationToken)
+            ?? throw new InvalidDataException("Existing teacher profiles are required; previous output preserved.");
+        var snapshot = new ManualScheduleOverrideDocument
+        {
+            PreferOfficialApi = true,
+            SourceFile = CfuScheduleSourceClient.ApiBaseUrl,
+            ImportedAtUtc = DateTimeOffset.UtcNow,
+            Bells = index.Bells, Weeks = index.Weeks, Tree = index.Tree, CurrentWeek = index.CurrentWeek,
+            Groups = groups.OrderBy(group => group.Code, StringComparer.Ordinal).ToArray(),
+        };
+        ReferenceCatalogSnapshot updated = MergeCatalog(catalog, snapshot);
+        // Materialize both validated documents before replacing either published file.
+        string timetableJson = JsonSerializer.Serialize(snapshot, JsonOptions);
+        string catalogJson = JsonSerializer.Serialize(updated, JsonOptions);
+        await WriteAtomicAsync(options.ManualScheduleOutputPath!, timetableJson, cancellationToken);
+        await WriteAtomicAsync(options.OutputPath, catalogJson, cancellationToken);
+        await WriteAtomicAsync(Path.Combine(options.ReportsDirectory, "official-schedule-import.md"),
+            $"# Официальное расписание КФУ\n\nИсточник: {snapshot.SourceFile}\n\n" +
+            $"Получено: {snapshot.ImportedAtUtc:O}\n\nГрупп: {groups.Count}. Записей занятий: {groups.Sum(group => group.Lessons.Count)}.\n\n" +
+            "Официальный API — основной источник. Этот снимок используется только при недоступности сети; более новый локальный кэш не заменяется. Временные Excel-переопределения сняты. Карточки преподавателей сохранены, их расписания заменены официальными.\n",
+            cancellationToken);
+    }
+
     private static async Task<ManualScheduleOverrideDocument?> ReadManualScheduleAsync(
         string path,
         CancellationToken cancellationToken)
@@ -73,7 +106,7 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
         ManualScheduleOverrideDocument incoming,
         bool replaceGroups)
     {
-        if (previous is null || previous.Groups.Count == 0)
+        if (previous is null || previous.PreferOfficialApi || previous.Groups.Count == 0)
         {
             return incoming;
         }
@@ -241,7 +274,7 @@ public sealed class ExcelScheduleWriter(ImportOptions options)
         foreach (TeacherReference teacher in catalog.Teachers)
         {
             // Replace all entries for overridden groups, including teachers removed by a substitution.
-            TeacherScheduleEntry[] retained = teacher.Schedule
+            TeacherScheduleEntry[] retained = parsed.PreferOfficialApi ? [] : teacher.Schedule
                 .Where(entry => !overriddenGroups.Contains(ExcelScheduleImporter.NormalizeGroupCode(entry.GroupCode))).ToArray();
             if (!additions.TryGetValue(teacher.IdentityKey, out List<TeacherScheduleEntry>? extra) ||
                 existingByKey[teacher.IdentityKey].Length > 1)

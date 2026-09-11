@@ -9,6 +9,13 @@ namespace UniversitySchedule.Mobile.Core.Cfu;
 /// </summary>
 public sealed class ManualScheduleOverrideDocument
 {
+    // False for operator Excel overrides, true for an official offline fallback snapshot.
+    [JsonPropertyName("preferOfficialApi")]
+    public bool PreferOfficialApi { get; init; }
+
+    [JsonPropertyName("now")]
+    public CfuCurrentWeekDocument CurrentWeek { get; init; } = new();
+
     [JsonPropertyName("sourceFile")]
     public string SourceFile { get; init; } = string.Empty;
 
@@ -32,6 +39,7 @@ public sealed class ManualScheduleOverrideDocument
     {
         Bells = Bells,
         Weeks = Weeks,
+        CurrentWeek = CurrentWeek,
         Tree = Tree,
     };
 

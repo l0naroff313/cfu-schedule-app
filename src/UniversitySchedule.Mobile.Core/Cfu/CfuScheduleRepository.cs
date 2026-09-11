@@ -60,7 +60,7 @@ public sealed class CfuScheduleRepository
 				ValidateIndex,
 				cancellationToken);
 			ManualScheduleOverrideDocument? manual = await LoadManualScheduleOverrideAsync(cancellationToken);
-			CfuScheduleIndexDocument index = manual is null || manual.Tree.Count == 0
+			CfuScheduleIndexDocument index = manual is null || manual.PreferOfficialApi || manual.Tree.Count == 0
 				? result.Value
 				: MergeCatalogIndex(result.Value, manual);
 			return new CfuCatalogLoadResult(
@@ -131,7 +131,7 @@ public sealed class CfuScheduleRepository
 
 		ManualScheduleOverrideDocument? manual = await LoadManualScheduleOverrideAsync(cancellationToken);
 		CfuGroupScheduleDocument? manualSchedule = manual?.FindGroup(groupCode);
-			if (manual is not null && manualSchedule is not null && manual.Bells.Count > 0)
+			if (manual is not null && !manual.PreferOfficialApi && manualSchedule is not null && manual.Bells.Count > 0)
 		{
 			CfuScheduleIndexDocument manualIndex = manual.ToIndex();
 			await SaveManualScheduleCacheAsync(manualIndex, manualSchedule, manual.ImportedAtUtc, cancellationToken);
@@ -141,6 +141,13 @@ public sealed class CfuScheduleRepository
 				manual.ImportedAtUtc,
 				IsFromCache: true);
 		}
+
+        if (manual is { PreferOfficialApi: true } && manualSchedule is not null && manual.Bells.Count > 0)
+        {
+            // Seed only older/missing copies. A newer successful API response must never be rolled back.
+            await SeedFallbackAsync(IndexKey, manual.ToIndex(), manual.ImportedAtUtc, cancellationToken);
+            await SeedFallbackAsync(GroupKey(groupCode), manualSchedule, manual.ImportedAtUtc, cancellationToken);
+        }
 
 		DocumentLoadResult<CfuScheduleIndexDocument> index = await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
             IndexKey,
@@ -176,7 +183,7 @@ public sealed class CfuScheduleRepository
 
 		ManualScheduleOverrideDocument? manual = await LoadManualScheduleOverrideAsync(cancellationToken);
 		IReadOnlyList<CfuLessonDocument> manualLessons = manual?.FindTeacherLessons(normalizedQuery) ?? [];
-		if (manual is not null && manualLessons.Count > 0 && manual.Bells.Count > 0)
+		if (manual is not null && !manual.PreferOfficialApi && manualLessons.Count > 0 && manual.Bells.Count > 0)
 		{
 			return new CfuTeacherSearchLoadResult(
 				CfuScheduleMapper.MapTeacherSearch(manual.ToIndex(), manualLessons),
@@ -184,12 +191,18 @@ public sealed class CfuScheduleRepository
 				IsFromCache: true);
 		}
 
+        string key = $"cfu:teacher:{NormalizeKey(normalizedQuery)}";
+        if (manual is { PreferOfficialApi: true } && manual.Bells.Count > 0)
+        {
+            await SeedFallbackAsync(IndexKey, manual.ToIndex(), manual.ImportedAtUtc, cancellationToken);
+            await SeedFallbackAsync(key, manualLessons, manual.ImportedAtUtc, cancellationToken);
+        }
+
         DocumentLoadResult<CfuScheduleIndexDocument> index = await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
             IndexKey,
             "index",
             ValidateIndex,
             cancellationToken);
-        string key = $"cfu:teacher:{NormalizeKey(normalizedQuery)}";
         DocumentLoadResult<IReadOnlyList<CfuLessonDocument>> lessons = await LoadNetworkFirstAsync<IReadOnlyList<CfuLessonDocument>>(
             key,
             $"find?by=teacher&q={Uri.EscapeDataString(normalizedQuery)}",
@@ -203,6 +216,15 @@ public sealed class CfuScheduleRepository
             CfuScheduleMapper.MapTeacherSearch(index.Value, lessons.Value),
             updatedAt,
             index.IsFromCache || lessons.IsFromCache);
+    }
+
+    private async Task SeedFallbackAsync<T>(string key, T value, DateTimeOffset capturedAt,
+        CancellationToken cancellationToken)
+    {
+        LocalDocument? existing = await _localDataStore.GetAsync(key, cancellationToken);
+        if (existing is null || existing.UpdatedAtUtc < capturedAt)
+            await _localDataStore.SaveAsync(new LocalDocument(key,
+                JsonSerializer.Serialize(value, JsonOptions), capturedAt), cancellationToken);
     }
 
     private async Task<DocumentLoadResult<T>> LoadNetworkFirstAsync<T>(

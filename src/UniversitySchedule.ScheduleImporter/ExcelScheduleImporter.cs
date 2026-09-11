@@ -620,6 +620,11 @@ public sealed partial class ExcelScheduleImporter
 
 public sealed class ManualScheduleOverrideDocument
 {
+    public bool PreferOfficialApi { get; init; }
+
+    [JsonPropertyName("now")]
+    public CfuCurrentWeekDocument CurrentWeek { get; init; } = new();
+
     [JsonPropertyName("groupCourses")]
     public IReadOnlyDictionary<string, int> GroupCourses { get; init; } = new Dictionary<string, int>();
 

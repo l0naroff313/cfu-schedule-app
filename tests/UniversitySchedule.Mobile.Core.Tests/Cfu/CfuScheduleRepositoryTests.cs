@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using UniversitySchedule.Mobile.Core.Cfu;
 using UniversitySchedule.Mobile.Core.Storage;
 
@@ -138,6 +139,83 @@ public sealed class CfuScheduleRepositoryTests
 
         Assert.Single(document.FindTeacherLessons("Зуев"));
         Assert.Empty(document.FindTeacherLessons("Зу"));
+    }
+
+    [Theory]
+    [InlineData(true, 2019, "Алгоритмы")]
+    [InlineData(false, 2019, "Официальный снимок")]
+    [InlineData(false, 2021, "Новый локальный кэш")]
+    public async Task OfficialMode_ApiWins_AndFallbackNeverRollsBackNewerCache(bool online, int cacheYear, string expected)
+    {
+        var store = new InMemoryLocalDataStore();
+        var cachedAt = new DateTimeOffset(cacheYear, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        await store.SaveAsync(new LocalDocument("cfu:index", IndexJson, cachedAt));
+        await store.SaveAsync(new LocalDocument("cfu:group:мат-б-о-251",
+            GroupJson.Replace("Алгоритмы", "Новый локальный кэш"), cachedAt));
+        var repository = new CfuScheduleRepository(CreateClient(request => online
+            ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(
+                request.RequestUri!.AbsolutePath.EndsWith("index") ? IndexJson : GroupJson, Encoding.UTF8, "application/json") }
+            : new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)), store, OfficialFallback());
+        var result = await repository.LoadGroupScheduleAsync("МАТ-б-о-251");
+        Assert.Equal(!online, result.IsFromCache);
+        Assert.Equal(expected, Assert.Single(result.Snapshot.Lessons).Subject);
+        var saved = await repository.LoadCachedGroupScheduleAsync("МАТ-б-о-251");
+        Assert.Equal(expected, Assert.Single(saved!.Snapshot.Lessons).Subject);
+    }
+
+    [Fact]
+    public async Task OfficialEmptyResponse_CancelsOldLessons_WithoutRestoringFallback()
+    {
+        var repository = new CfuScheduleRepository(CreateClient(request => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(request.RequestUri!.AbsolutePath.EndsWith("index") ? IndexJson
+                : """{"код":"МАТ-б-о-251","занятия":[],"fak":[]} """, Encoding.UTF8, "application/json"),
+        }), new InMemoryLocalDataStore(), OfficialFallback());
+        var result = await repository.LoadGroupScheduleAsync("МАТ-б-о-251");
+        Assert.False(result.IsFromCache);
+        Assert.Empty(result.Snapshot.Lessons);
+        Assert.Empty((await repository.LoadCachedGroupScheduleAsync("МАТ-б-о-251"))!.Snapshot.Lessons);
+    }
+
+    [Fact]
+    public async Task OfficialTeacherSearch_UsesLiveEmptyResponse_NotBundledLessons()
+    {
+        var repository = new CfuScheduleRepository(CreateClient(request => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(request.RequestUri!.AbsolutePath.EndsWith("index") ? IndexJson : "[]",
+                Encoding.UTF8, "application/json"),
+        }), new InMemoryLocalDataStore(), OfficialFallback());
+        var result = await repository.SearchTeachersAsync("Иванова");
+        Assert.False(result.IsFromCache);
+        Assert.Empty(result.Search.Lessons);
+    }
+
+    [Theory]
+    [InlineData("{\"код\":\"МАТ-б-о-251\"}")]
+    [InlineData("{\"код\":\"ДРУГАЯ\",\"занятия\":[]}")]
+    [InlineData("not json")]
+    public async Task MalformedOfficialResponse_DoesNotEraseWorkingFallback(string broken)
+    {
+        var repository = new CfuScheduleRepository(CreateClient(request => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(request.RequestUri!.AbsolutePath.EndsWith("index") ? IndexJson : broken,
+                Encoding.UTF8, "application/json"),
+        }), new InMemoryLocalDataStore(), OfficialFallback());
+        var result = await repository.LoadGroupScheduleAsync("МАТ-б-о-251");
+        Assert.True(result.IsFromCache);
+        Assert.Equal("Официальный снимок", Assert.Single(result.Snapshot.Lessons).Subject);
+    }
+
+    private static StubManualScheduleOverrideProvider OfficialFallback()
+    {
+        var index = JsonSerializer.Deserialize<CfuScheduleIndexDocument>(IndexJson)!;
+        return new(new ManualScheduleOverrideDocument
+        {
+            PreferOfficialApi = true,
+            ImportedAtUtc = new(2020, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            Bells = index.Bells, Weeks = index.Weeks, Tree = index.Tree,
+            Groups = [JsonSerializer.Deserialize<CfuGroupScheduleDocument>(GroupJson.Replace("Алгоритмы", "Официальный снимок"))!],
+        });
     }
 
     private static HttpClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> response)
