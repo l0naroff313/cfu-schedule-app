@@ -1,5 +1,5 @@
 {
   "private": true,
-  "scripts": { "test": "node --test offline.test.cjs" },
+  "scripts": { "test": "node --test offline.test.cjs notifications.test.cjs" },
   "devDependencies": { "playwright": "1.62.1" }
 }

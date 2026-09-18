@@ -76,41 +76,58 @@
 
     const notificationTimers = new Map();
     const notificationTimerLimit = 2147483647;
+    let notificationGeneration = 0;
 
-    function armNotification(item) {
+    function armNotification(item, generation) {
         const triggerAt = new Date(item.triggerAt).getTime();
         if (!Number.isFinite(triggerAt)) return;
         const delay = triggerAt - Date.now();
         if (delay <= 0) return;
-        const timer = setTimeout(() => {
+        const timer = setTimeout(async () => {
+            if (generation !== notificationGeneration) return;
             notificationTimers.delete(item.id);
             if (delay > notificationTimerLimit) {
-                armNotification(item);
+                armNotification(item, generation);
                 return;
             }
             if (Notification.permission !== 'granted') return;
-            const deadline = new Date(item.deadline).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
-            new Notification(`Дедлайн: ${item.subject || 'Домашнее задание'}`, {
-                body: `${item.text} • дедлайн ${deadline}`,
-                tag: `cfu-assignment-${item.id}`,
-                renotify: true,
-            });
+            try {
+                const registration = await navigator.serviceWorker.getRegistration(document.baseURI);
+                if (!registration?.active || generation !== notificationGeneration) return;
+                const deadline = new Date(item.deadline).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Moscow' });
+                await registration.showNotification(`Дедлайн: ${item.subject || 'Домашнее задание'}`, {
+                    body: `${item.text} • дедлайн ${deadline} (МСК)`,
+                    tag: `cfu-assignment-${item.id}`,
+                    icon: new URL('icons/appicon-192.png', document.baseURI).href,
+                    data: { url: document.baseURI },
+                });
+            } catch (error) {
+                console.warn('Не удалось показать напоминание:', error);
+            }
         }, Math.min(delay, notificationTimerLimit));
         notificationTimers.set(item.id, timer);
     }
 
     window.cfuNotifications = {
         requestPermission: async () => {
-            if (!('Notification' in window)) return 'unsupported';
-            return await Notification.requestPermission();
+            if (!('Notification' in window) || !('serviceWorker' in navigator)) return 'unsupported';
+            try {
+                // Request immediately within the user's tap, before awaiting worker readiness.
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') return permission;
+                const registration = await navigator.serviceWorker.getRegistration(document.baseURI);
+                return registration?.active && typeof registration.showNotification === 'function' ? 'granted' : 'not-ready';
+            } catch { return 'unsupported'; }
         },
         schedule: items => {
             for (const timer of notificationTimers.values()) clearTimeout(timer);
             notificationTimers.clear();
+            const generation = ++notificationGeneration;
             if (!('Notification' in window) || Notification.permission !== 'granted') return;
             for (const item of (items || [])) {
-                if (!item?.id) item.id = `${item.subject || ''}:${item.deadline || ''}`;
-                armNotification(item);
+                if (!item) continue;
+                const normalized = { ...item, id: item.id || `${item.subject || ''}:${item.deadline || ''}` };
+                armNotification(normalized, generation);
             }
         }
     };

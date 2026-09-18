@@ -20,6 +20,9 @@ public sealed class CfuScheduleIndexDocument
 
 public sealed class CfuCurrentWeekDocument
 {
+    [JsonPropertyName("before_start")]
+    public bool BeforeStart { get; init; }
+
     [JsonPropertyName("parity")]
     public string Parity { get; init; } = string.Empty;
 

@@ -106,6 +106,7 @@ internal sealed class AndroidAssignmentReminderScheduler : IAssignmentReminderSc
     {
         DateTimeOffset trigger = assignment.DeadlineUtc!.Value.AddMinutes(-assignment.ReminderMinutesBefore!.Value);
         Intent intent = new Intent(context, typeof(CfuAssignmentReminderReceiver))
+            .PutExtra("notification_id", requestCode)
             .PutExtra(AssignmentIdExtra, assignment.Id.ToString("D"))
             .PutExtra(SubjectExtra, assignment.Subject)
             .PutExtra(TextExtra, assignment.Text)

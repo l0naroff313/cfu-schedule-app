@@ -136,6 +136,52 @@ for (const [browserName, browserType] of [['chromium', chromium], ['webkit', web
             assert.equal(repaired.isReady, true);
             assert.ok(await page.evaluate(url => caches.match(url).then(Boolean), removed));
 
+            // Real browser change events include seconds in datetime-local values.
+            await page.getByRole('navigation').getByRole('button', { name: 'Задания', exact: true }).click();
+            await page.getByRole('button', { name: 'Новое задание', exact: true }).click();
+            await page.getByPlaceholder('Название предмета').fill('Алгоритмы');
+            await page.getByPlaceholder('Опишите задание').fill('Проверить дедлайн');
+            await page.locator('input[type=datetime-local]').fill('2099-12-25T12:34');
+            await page.locator('input[type=datetime-local]').blur();
+            await page.getByRole('button', { name: 'Сохранить задание', exact: true }).click();
+            await page.locator('.editor-layer').waitFor({ state: 'hidden' });
+            const savedAssignment = await page.evaluate(async () => JSON.parse((await cfuStorage.getDocument('personal-assignments:v1')).content)[0]);
+            assert.equal(savedAssignment.DeadlineUtc, '2099-12-25T09:34:00+00:00');
+            // Blazor caches resolved JS functions. Install the test boundary before
+            // runtime startup and change its result, not the function reference.
+            await page.addInitScript(() => {
+                let notifications;
+                window.testReminderSchedules = [];
+                window.testNotificationPermission = 'unsupported';
+                Object.defineProperty(window, 'cfuNotifications', {
+                    configurable: true,
+                    get: () => notifications,
+                    set: value => {
+                        notifications = value;
+                        value.requestPermission = async () => window.testNotificationPermission;
+                        value.schedule = items => window.testReminderSchedules.push(items);
+                    }
+                });
+            });
+            await page.reload();
+            await page.getByRole('navigation').getByRole('button', { name: 'Задания', exact: true }).click();
+            await page.locator('.personal-row .row-main').click();
+            assert.equal(await page.locator('input[type=datetime-local]').inputValue(), '2099-12-25T12:34');
+            await page.getByLabel('Напоминание', { exact: false }).selectOption('5');
+            await page.getByRole('button', { name: 'Сохранить задание', exact: true }).click();
+            await page.getByText('Уведомления недоступны в этом браузере.', { exact: false }).waitFor();
+            assert.equal(await page.locator('.editor-layer').isVisible(), true);
+            await page.evaluate(() => { window.testNotificationPermission = 'granted'; });
+            await page.getByRole('button', { name: 'Сохранить задание', exact: true }).click();
+            await page.locator('.editor-layer').waitFor({ state: 'hidden' });
+            await page.locator('.personal-row .row-main').click();
+            await page.getByPlaceholder('Опишите задание').fill('Обновлённый текст напоминания');
+            await page.getByRole('button', { name: 'Сохранить задание', exact: true }).click();
+            await page.locator('.editor-layer').waitFor({ state: 'hidden' });
+            await page.waitForFunction(() => testReminderSchedules.at(-1)?.[0]?.text === 'Обновлённый текст напоминания');
+            await page.locator('.personal-row .round-check span').click();
+            await page.waitForFunction(() => testReminderSchedules.at(-1)?.length === 0);
+
             // A stalled readiness check must never hold the startup splash screen.
             // This also verifies that the saved timetable is rendered before background work.
             await page.close();

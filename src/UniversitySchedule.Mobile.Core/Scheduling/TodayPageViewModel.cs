@@ -163,7 +163,7 @@ public sealed class TodayPageViewModel : ObservableObject
         DateTimeOffset universityNow = now.ToOffset(UniversityUtcOffset);
         DateOnly today = DateOnly.FromDateTime(universityNow.DateTime);
         DateText = Capitalize(universityNow.ToString("dddd, d MMMM", RussianCulture));
-        AcademicWeekParity parity = AcademicWeekParityResolver.Resolve(today, _referenceCatalog?.Calendar);
+        AcademicWeekParity parity = AcademicWeekParityResolver.Resolve(today, _scheduleSession.Calendar ?? _referenceCatalog?.Calendar);
         WeekParityText = AcademicWeekParityResolver.Format(parity);
         HasWeekParity = parity != AcademicWeekParity.Unknown;
 
@@ -234,6 +234,7 @@ public sealed class TodayPageViewModel : ObservableObject
         StatusText = _scheduleSession.UpdatedAtUtc is DateTimeOffset updatedAt
             ? $"{(_scheduleSession.IsFromCache ? "Офлайн-копия" : "Обновлено")} {updatedAt.ToLocalTime():dd.MM.yyyy HH:mm}"
             : "Расписание загружено.";
+        if (_scheduleSession.LastError is { } warning) StatusText += $" • {warning}";
     }
 
     private static TodayLessonCard CreateCard(

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using UniversitySchedule.Contracts.Schedule;
+using UniversitySchedule.Contracts.Catalog;
 using UniversitySchedule.Mobile.Core.Storage;
 
 namespace UniversitySchedule.Mobile.Core.Cfu;
@@ -14,7 +15,9 @@ public sealed record CfuCatalogLoadResult(
 public sealed record CfuScheduleLoadResult(
     ScheduleSnapshot Snapshot,
     DateTimeOffset UpdatedAtUtc,
-    bool IsFromCache);
+    bool IsFromCache,
+    string? Warning = null,
+    ReferenceScheduleCalendar? Calendar = null);
 
 public sealed record CfuTeacherSearchLoadResult(
     CfuTeacherScheduleSearch Search,
@@ -55,7 +58,7 @@ public sealed class CfuScheduleRepository
 		try
 		{
 			DocumentLoadResult<CfuScheduleIndexDocument> result = await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
-				IndexKey,
+				"cfu:catalog",
 				"index",
 				ValidateIndex,
 				cancellationToken);
@@ -95,10 +98,16 @@ public sealed class CfuScheduleRepository
 		if (saved is not null)
 		{
 			CachedGroupDocument pair = Deserialize<CachedGroupDocument>(saved.Content, value => value);
+			bool repaired = !CfuCalendarIntegrity.IsUsable(pair.Index);
+			CfuScheduleIndexDocument calendar = repaired
+				? (await RecoverCalendarAsync(null, cancellationToken)).Value
+				: pair.Index;
 			return new CfuScheduleLoadResult(
-				CfuScheduleMapper.MapGroup(ValidateIndex(pair.Index), ValidateGroup(pair.Schedule, groupCode), subgroup),
+				CfuScheduleMapper.MapGroup(ValidateScheduleIndex(calendar), ValidateGroup(pair.Schedule, groupCode), subgroup),
 				saved.UpdatedAtUtc,
-				IsFromCache: true);
+				IsFromCache: true,
+				Warning: repaired ? CfuCalendarIntegrity.FallbackWarning : pair.Warning,
+				Calendar: ToCalendar(calendar));
 		}
 
 		// Compatibility with copies saved by earlier app versions.
@@ -110,6 +119,8 @@ public sealed class CfuScheduleRepository
         }
 
         CfuScheduleIndexDocument index = Deserialize<CfuScheduleIndexDocument>(indexDocument.Content, ValidateIndex);
+        bool repairedLegacy = !CfuCalendarIntegrity.IsUsable(index);
+        if (repairedLegacy) index = (await RecoverCalendarAsync(null, cancellationToken)).Value;
         CfuGroupScheduleDocument schedule = Deserialize<CfuGroupScheduleDocument>(
             groupDocument.Content,
             value => ValidateGroup(value, groupCode));
@@ -119,7 +130,9 @@ public sealed class CfuScheduleRepository
         return new CfuScheduleLoadResult(
             CfuScheduleMapper.MapGroup(index, schedule, subgroup),
             updatedAt,
-            IsFromCache: true);
+            IsFromCache: true,
+            Warning: repairedLegacy ? CfuCalendarIntegrity.FallbackWarning : null,
+            Calendar: ToCalendar(index));
     }
 
     public async Task<CfuScheduleLoadResult> LoadGroupScheduleAsync(
@@ -139,7 +152,8 @@ public sealed class CfuScheduleRepository
 			return new CfuScheduleLoadResult(
 				CfuScheduleMapper.MapGroup(manualIndex, manualSchedule, subgroup),
 				manual.ImportedAtUtc,
-				IsFromCache: true);
+				IsFromCache: true,
+				Calendar: ToCalendar(manualIndex));
 		}
 
         if (manual is { PreferOfficialApi: true } && manualSchedule is not null && manual.Bells.Count > 0)
@@ -149,25 +163,24 @@ public sealed class CfuScheduleRepository
             await SeedFallbackAsync(GroupKey(groupCode), manualSchedule, manual.ImportedAtUtc, cancellationToken);
         }
 
-		DocumentLoadResult<CfuScheduleIndexDocument> index = await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
-            IndexKey,
-            "index",
-            ValidateIndex,
-            cancellationToken);
+		DocumentLoadResult<CfuScheduleIndexDocument> index = await LoadScheduleIndexAsync(groupCode, cancellationToken);
         DocumentLoadResult<CfuGroupScheduleDocument> schedule = await LoadNetworkFirstAsync<CfuGroupScheduleDocument>(
             GroupKey(groupCode),
             $"group?code={Uri.EscapeDataString(groupCode.Trim())}",
-            value => ValidateGroup(value, groupCode),
+            value => ValidateMappedGroup(value, groupCode, index.Value),
             cancellationToken);
         DateTimeOffset updatedAt = index.UpdatedAtUtc < schedule.UpdatedAtUtc
             ? index.UpdatedAtUtc
             : schedule.UpdatedAtUtc;
 
-        await SavePairedCacheAsync(index.Value, schedule.Value, updatedAt, cancellationToken);
+        string? warning = index.IsFromCache ? CfuCalendarIntegrity.FallbackWarning : null;
+        await SavePairedCacheAsync(index.Value, schedule.Value, updatedAt, cancellationToken, warning);
         return new CfuScheduleLoadResult(
             CfuScheduleMapper.MapGroup(index.Value, schedule.Value, subgroup),
             updatedAt,
-            index.IsFromCache || schedule.IsFromCache);
+            index.IsFromCache || schedule.IsFromCache,
+            warning,
+            ToCalendar(index.Value));
     }
 
     public async Task<CfuTeacherSearchLoadResult> SearchTeachersAsync(
@@ -198,11 +211,7 @@ public sealed class CfuScheduleRepository
             await SeedFallbackAsync(key, manualLessons, manual.ImportedAtUtc, cancellationToken);
         }
 
-        DocumentLoadResult<CfuScheduleIndexDocument> index = await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
-            IndexKey,
-            "index",
-            ValidateIndex,
-            cancellationToken);
+        DocumentLoadResult<CfuScheduleIndexDocument> index = await LoadScheduleIndexAsync(null, cancellationToken);
         DocumentLoadResult<IReadOnlyList<CfuLessonDocument>> lessons = await LoadNetworkFirstAsync<IReadOnlyList<CfuLessonDocument>>(
             key,
             $"find?by=teacher&q={Uri.EscapeDataString(normalizedQuery)}",
@@ -332,12 +341,85 @@ public sealed class CfuScheduleRepository
 
 	// Keep the group's calendar and lessons together even when teacher/catalog requests change the global index.
 	private Task SavePairedCacheAsync(CfuScheduleIndexDocument index, CfuGroupScheduleDocument schedule,
-		DateTimeOffset updatedAtUtc, CancellationToken cancellationToken) =>
+		DateTimeOffset updatedAtUtc, CancellationToken cancellationToken, string? warning = null) =>
 		_localDataStore.SaveAsync(new LocalDocument(CachedGroupKey(schedule.Code),
-			JsonSerializer.Serialize(new CachedGroupDocument(index, schedule), JsonOptions), updatedAtUtc), cancellationToken);
+			JsonSerializer.Serialize(new CachedGroupDocument(index, schedule, warning), JsonOptions), updatedAtUtc), cancellationToken);
 
 	private static string CachedGroupKey(string groupCode) => $"cfu:cached-group:{NormalizeKey(groupCode)}";
-	private sealed record CachedGroupDocument(CfuScheduleIndexDocument Index, CfuGroupScheduleDocument Schedule);
+	private sealed record CachedGroupDocument(CfuScheduleIndexDocument Index, CfuGroupScheduleDocument Schedule, string? Warning = null);
+
+    private async Task<DocumentLoadResult<CfuScheduleIndexDocument>> LoadScheduleIndexAsync(
+        string? groupCode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await LoadNetworkFirstAsync<CfuScheduleIndexDocument>(
+                IndexKey, "index", ValidateScheduleIndex, cancellationToken);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or InvalidDataException or JsonException)
+        {
+            return await RecoverCalendarAsync(groupCode, cancellationToken);
+        }
+    }
+
+    private async Task<DocumentLoadResult<CfuScheduleIndexDocument>> RecoverCalendarAsync(
+        string? groupCode, CancellationToken cancellationToken)
+    {
+        // A paired group copy is independent of catalog and teacher requests.
+        if (groupCode is not null)
+        {
+            LocalDocument? saved = await _localDataStore.GetAsync(CachedGroupKey(groupCode), cancellationToken);
+            if (saved is not null)
+            {
+                try
+                {
+                    var pair = Deserialize<CachedGroupDocument>(saved.Content, value => value);
+                    return new(ValidateScheduleIndex(pair.Index), saved.UpdatedAtUtc, true);
+                }
+                catch (Exception exception) when (exception is JsonException or InvalidDataException) { }
+            }
+        }
+
+        LocalDocument? global = await _localDataStore.GetAsync(IndexKey, cancellationToken);
+        if (global is not null)
+        {
+            try { return new(Deserialize<CfuScheduleIndexDocument>(global.Content, ValidateScheduleIndex), global.UpdatedAtUtc, true); }
+            catch (Exception exception) when (exception is JsonException or InvalidDataException) { }
+        }
+
+        ManualScheduleOverrideDocument? bundled = await LoadManualScheduleOverrideAsync(cancellationToken);
+        if (bundled is not null && CfuCalendarIntegrity.IsUsable(bundled.ToIndex()))
+        {
+            CfuScheduleIndexDocument index = ValidateScheduleIndex(bundled.ToIndex());
+            // Repair copies poisoned by older app versions, retaining the actual capture timestamp.
+            await _localDataStore.SaveAsync(new LocalDocument(IndexKey,
+                JsonSerializer.Serialize(index, JsonOptions), bundled.ImportedAtUtc), cancellationToken);
+            return new(index, bundled.ImportedAtUtc, true);
+        }
+
+        throw new InvalidDataException("КФУ вернул неполный календарь недель, а проверенной копии ещё нет. Повторите обновление позже.");
+    }
+
+    private static CfuScheduleIndexDocument ValidateScheduleIndex(CfuScheduleIndexDocument index)
+    {
+        ValidateIndex(index);
+        if (!CfuCalendarIntegrity.IsUsable(index))
+            throw new InvalidDataException("КФУ вернул неполный календарь учебных недель.");
+        return index;
+    }
+
+    private static ReferenceScheduleCalendar ToCalendar(CfuScheduleIndexDocument index) => new(
+        index.Bells.Select(bell => new ReferenceBell(bell.PairNumber, bell.StartsAt, bell.EndsAt)).ToArray(),
+        index.Weeks.EvenWeekMondays, index.Weeks.OddWeekMondays);
+
+    private static CfuGroupScheduleDocument ValidateMappedGroup(CfuGroupScheduleDocument group,
+        string groupCode, CfuScheduleIndexDocument index)
+    {
+        ValidateGroup(group, groupCode);
+        if (group.Lessons.Count > 0 && CfuScheduleMapper.MapGroup(index, group).Lessons.Count == 0)
+            throw new InvalidDataException("Занятия КФУ не удалось привязать к календарю. Сохранена предыдущая копия.");
+        return group;
+    }
 
 	private static CfuScheduleIndexDocument MergeCatalogIndex(
 		CfuScheduleIndexDocument official,

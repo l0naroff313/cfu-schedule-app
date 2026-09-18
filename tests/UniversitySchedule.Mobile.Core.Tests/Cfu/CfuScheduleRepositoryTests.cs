@@ -206,6 +206,88 @@ public sealed class CfuScheduleRepositoryTests
         Assert.Equal("Официальный снимок", Assert.Single(result.Snapshot.Lessons).Subject);
     }
 
+    [Theory]
+    [InlineData("ПИ-б-о-252")]
+    [InlineData("МАТ-б-о-261")]
+    public async Task TruncatedCalendar_UsesVerifiedCalendarAndFreshGroup_ThenRecovers(string code)
+    {
+        string good = IndexJson.Replace("МАТ-б-о-251", code);
+        string broken = good.Replace("\"ch\": [\"2026-09-07\"], \"nch\": [\"2026-09-14\"]",
+            "\"ch\": [\"2026-10-05\"], \"nch\": []");
+        string group = GroupJson.Replace("МАТ-б-о-251", code).Replace("\"день\": 1", "\"день\": 5")
+            .Replace("\"чётность\": \"чёт\"", "\"чётность\": \"нечёт\"");
+        var store = new InMemoryLocalDataStore();
+        var calendar = JsonSerializer.Deserialize<CfuScheduleIndexDocument>(good)!;
+        // Only a calendar is bundled: new groups must work without an old bundled timetable.
+        var fallback = new StubManualScheduleOverrideProvider(new ManualScheduleOverrideDocument
+        {
+            PreferOfficialApi = true, ImportedAtUtc = DateTimeOffset.Parse("2026-09-11T10:00:00Z"),
+            Bells = calendar.Bells, Weeks = calendar.Weeks, Tree = calendar.Tree,
+        });
+        bool healthy = false;
+        var repository = new CfuScheduleRepository(CreateClient(request => new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(request.RequestUri!.AbsolutePath.EndsWith("index")
+                ? healthy ? good : broken : group, Encoding.UTF8, "application/json"),
+        }), store, fallback);
+
+        var result = await repository.LoadGroupScheduleAsync(code, 1);
+        Assert.Equal(new DateOnly(2026, 9, 18), Assert.Single(result.Snapshot.Lessons).Date);
+        Assert.True(result.IsFromCache);
+        Assert.NotNull(result.Warning);
+        string savedCalendar = (await store.GetAsync("cfu:index"))!.Content;
+        Assert.True(CfuCalendarIntegrity.IsUsable(JsonSerializer.Deserialize<CfuScheduleIndexDocument>(savedCalendar)!));
+        Assert.NotNull((await repository.LoadCachedGroupScheduleAsync(code, 1))!.Warning);
+
+        // Repeated malformed refresh must not erase working weeks or their capture date.
+        var again = await repository.LoadGroupScheduleAsync(code, 1);
+        Assert.Equal(result.UpdatedAtUtc, again.UpdatedAtUtc);
+        Assert.Single(again.Snapshot.Lessons);
+
+        healthy = true;
+        var restored = await repository.LoadGroupScheduleAsync(code, 1);
+        Assert.False(restored.IsFromCache);
+        Assert.Null(restored.Warning);
+        Assert.Null((await repository.LoadCachedGroupScheduleAsync(code, 1))!.Warning);
+    }
+
+    [Fact]
+    public async Task LegacyPoisonedPair_IsRepairedWithoutNetwork()
+    {
+        var store = new InMemoryLocalDataStore();
+        string broken = IndexJson.Replace("\"nch\": [\"2026-09-14\"]", "\"nch\": []");
+        string paired = "{\"Index\":" + broken + ",\"Schedule\":" + GroupJson + "}";
+        await store.SaveAsync(new("cfu:cached-group:мат-б-о-251", paired, DateTimeOffset.UtcNow));
+        var repository = new CfuScheduleRepository(CreateClient(_ => throw new Exception("No network on cached startup")), store, OfficialFallback());
+        var result = await repository.LoadCachedGroupScheduleAsync("МАТ-б-о-251");
+        Assert.NotNull(result);
+        Assert.Single(result.Snapshot.Lessons);
+        Assert.NotNull(result.Warning);
+    }
+
+    [Fact]
+    public async Task UnrecoverableCalendar_ThrowsInsteadOfSavingEmptySchedule()
+    {
+        var store = new InMemoryLocalDataStore();
+        string broken = IndexJson.Replace("\"nch\": [\"2026-09-14\"]", "\"nch\": []");
+        var repository = new CfuScheduleRepository(CreateClient(_ => new(HttpStatusCode.OK)
+        { Content = new StringContent(broken, Encoding.UTF8, "application/json") }), store);
+        await Assert.ThrowsAsync<InvalidDataException>(() => repository.LoadGroupScheduleAsync("МАТ-б-о-261"));
+        Assert.Null(await store.GetAsync("cfu:index"));
+        Assert.Null(await store.GetAsync("cfu:cached-group:мат-б-о-261"));
+    }
+
+    [Theory]
+    [InlineData("2026-09-07", "2026-09-07")]
+    [InlineData("2026-09-08", "2026-09-14")]
+    [InlineData("broken", "2026-09-14")]
+    [InlineData("2026-09-07", "2026-09-28")]
+    public void InvalidCalendar_IsRejected(string even, string odd)
+    {
+        Assert.False(CfuCalendarIntegrity.IsUsable(new()
+        { Weeks = new() { EvenWeekMondays = [even], OddWeekMondays = [odd] } }));
+    }
+
     private static StubManualScheduleOverrideProvider OfficialFallback()
     {
         var index = JsonSerializer.Deserialize<CfuScheduleIndexDocument>(IndexJson)!;

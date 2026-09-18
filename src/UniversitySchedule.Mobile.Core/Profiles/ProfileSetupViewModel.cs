@@ -171,7 +171,7 @@ public sealed class ProfileSetupViewModel(
             Replace(Institutes, _catalog.Institutes);
             RestoreSelection(_scheduleSession.Profile);
         }
-        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException or InvalidDataException or System.Text.Json.JsonException)
         {
             ErrorText = "Каталог КФУ пока недоступен. Проверьте интернет и повторите.";
             StatusText = "Не удалось загрузить каталог.";
@@ -214,7 +214,7 @@ public sealed class ProfileSetupViewModel(
             StatusText = "Расписание сохранено на устройстве.";
             return true;
         }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is InvalidOperationException or InvalidDataException or System.Text.Json.JsonException)
         {
             ErrorText = "Не удалось загрузить расписание этой группы. Проверьте интернет и повторите.";
             StatusText = "Профиль не изменён.";

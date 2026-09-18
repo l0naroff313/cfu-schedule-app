@@ -265,7 +265,7 @@ public sealed class SchedulePageViewModel : ObservableObject
 
     public AcademicWeekParity WeekParity => AcademicWeekParityResolver.Resolve(
         SelectedDate,
-        _referenceCatalog?.Calendar);
+        _scheduleSession?.Calendar ?? _referenceCatalog?.Calendar);
 
     public string WeekParityText => AcademicWeekParityResolver.Format(WeekParity);
 
@@ -354,6 +354,13 @@ public sealed class SchedulePageViewModel : ObservableObject
                 return "Найдите преподавателя, чтобы открыть его расписание.";
             }
 
+            if (!IsTeacherMode && _scheduleSession?.Snapshot is null && _scheduleSession?.LastError is { } error)
+                return error;
+
+            if (!IsTeacherMode && _scheduleSession?.Snapshot is { } snapshot &&
+                (SelectedDate < snapshot.From || SelectedDate > snapshot.To))
+                return "Для этой даты календарь ещё не загружен. Обновите расписание позже.";
+
             return Range == ScheduleRange.Day
                 ? "На выбранную дату занятий нет."
                 : "На выбранной неделе занятий нет.";
@@ -414,7 +421,7 @@ public sealed class SchedulePageViewModel : ObservableObject
             SetTeachers(result.Search.Teachers);
             SyncStatusText = FormatSyncStatus(result.UpdatedAtUtc, result.IsFromCache);
         }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is InvalidOperationException or InvalidDataException or System.Text.Json.JsonException)
         {
             SyncStatusText = "Поиск недоступен: нет сети и сохранённой копии.";
         }
@@ -550,7 +557,7 @@ public sealed class SchedulePageViewModel : ObservableObject
             RefreshVisibleLessons();
             SyncStatusText = FormatSyncStatus(result.UpdatedAtUtc, result.IsFromCache);
         }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is InvalidOperationException or InvalidDataException or System.Text.Json.JsonException)
         {
             // Keep the group-derived list when no full teacher schedule is available.
         }
@@ -558,6 +565,8 @@ public sealed class SchedulePageViewModel : ObservableObject
 
     private void ApplySession()
     {
+        OnPropertyChanged(nameof(WeekParityText));
+        OnPropertyChanged(nameof(HasWeekParity));
         if (_scheduleSession?.Snapshot is null)
         {
             _scheduleLessons = [];
@@ -578,7 +587,9 @@ public sealed class SchedulePageViewModel : ObservableObject
             : _referenceCatalog.Teachers.Select(teacher => new TeacherSummary(teacher.Id, teacher.FullName, teacher.Position)).Concat(groupTeachers));
         if (_scheduleSession.UpdatedAtUtc is DateTimeOffset updatedAt)
         {
-            SyncStatusText = FormatSyncStatus(updatedAt, _scheduleSession.IsFromCache);
+            SyncStatusText = _scheduleSession.LastError is { } warning
+                ? $"{FormatSyncStatus(updatedAt, _scheduleSession.IsFromCache)} • {warning}"
+                : FormatSyncStatus(updatedAt, _scheduleSession.IsFromCache);
         }
 
         RefreshVisibleLessons();

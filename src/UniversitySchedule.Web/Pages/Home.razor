@@ -134,7 +134,7 @@ else
             string scheduleKey = string.Join('|', State.Assignments
                 .Where(assignment => assignment.Status != PersonalAssignmentStatus.Completed && assignment.DeadlineUtc.HasValue && assignment.ReminderMinutesBefore is > 0)
                 .OrderBy(assignment => assignment.Id)
-                .Select(assignment => $"{assignment.Id:N}:{assignment.DeadlineUtc:O}:{assignment.ReminderMinutesBefore}"));
+                .Select(assignment => $"{assignment.Id:N}:{assignment.DeadlineUtc:O}:{assignment.ReminderMinutesBefore}:{assignment.UpdatedAtUtc:O}:{assignment.Subject}:{assignment.Text}"));
             if (!string.Equals(scheduleKey, _notificationScheduleKey, StringComparison.Ordinal))
             {
                 _notificationScheduleKey = scheduleKey;
@@ -388,7 +388,10 @@ else
                 }
                 @if (State.VisibleLessons.Count == 0)
                 {
-                    @EmptyCard("Занятий нет", "Для выбранного дня расписание не опубликовано.")
+                    @EmptyCard(State.Schedule is null && !State.IsTeacherMode ? "Расписание недоступно" : "Занятий нет",
+                        !State.IsTeacherMode && State.Schedule is { } snapshot && (State.SelectedDate < snapshot.From || State.SelectedDate > snapshot.To)
+                            ? "Для этой даты календарь ещё не загружен. Обновите расписание позже."
+                            : "Для выбранного дня расписание не опубликовано.")
                 }
             </section>
         </section>;
@@ -758,6 +761,11 @@ else
         _editorError = null;
         if (string.IsNullOrWhiteSpace(_assignmentText)) { _editorError = "Введите текст задания."; return; }
         DateTimeOffset? deadline = ParseDeadline(_assignmentDeadline);
+        if (!string.IsNullOrWhiteSpace(_assignmentDeadline) && deadline is null)
+        {
+            _editorError = "Не удалось прочитать дедлайн. Выберите дату и время ещё раз.";
+            return;
+        }
         if (_assignmentReminderMinutesBefore is not null && deadline is null)
         {
             _editorError = "Сначала укажите дедлайн для напоминания.";
@@ -766,9 +774,15 @@ else
         if (_assignmentReminderMinutesBefore is not null)
         {
             string permission = await JavaScript.InvokeAsync<string>("cfuNotifications.requestPermission");
-            if (permission == "denied")
+            if (permission != "granted")
             {
-                _editorError = "Уведомления запрещены в браузере. Разрешите их в настройках сайта.";
+                _editorError = permission switch
+                {
+                    "denied" => "Уведомления запрещены. Разрешите их в настройках сайта или выберите «Без напоминания».",
+                    "unsupported" => "Уведомления недоступны в этом браузере. На iPhone откройте установленную PWA с экрана Домой или выберите «Без напоминания».",
+                    "not-ready" => "Файлы приложения ещё устанавливаются. Повторите попытку позже или выберите «Без напоминания».",
+                    _ => "Разрешение на уведомления не получено. Повторите попытку или выберите «Без напоминания».",
+                };
                 return;
             }
         }
@@ -802,7 +816,7 @@ else
 
     private static DateTimeOffset? ParseDeadline(string value)
     {
-        if (!DateTime.TryParseExact(value, "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime result)) return null;
+        if (!DateTime.TryParseExact(value, ["yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-ddTHH:mm:ss.FFFFFFF"], CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime result)) return null;
         return new DateTimeOffset(DateTime.SpecifyKind(result, DateTimeKind.Unspecified), UniversityOffset).ToUniversalTime();
     }
 

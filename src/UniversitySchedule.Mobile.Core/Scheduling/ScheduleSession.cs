@@ -32,6 +32,7 @@ public sealed class ScheduleSession(
     public bool IsFromCache { get; private set; }
 
     public string? LastError { get; private set; }
+    public UniversitySchedule.Contracts.Catalog.ReferenceScheduleCalendar? Calendar { get; private set; }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -87,7 +88,7 @@ public sealed class ScheduleSession(
             Profile = profile;
             LastNetworkRefreshAtUtc = null;
             Apply(result);
-            LastError = null;
+            LastError = result.Warning;
             Changed?.Invoke(this, EventArgs.Empty);
         }
         finally
@@ -175,7 +176,7 @@ public sealed class ScheduleSession(
             throw new InvalidOperationException("Не удалось проверить сохранённую копию расписания.");
         }
 
-        LastError = null;
+        LastError = result.Warning;
         Changed?.Invoke(this, EventArgs.Empty);
         return new OfflineSchedulePreparationResult(readiness, !result.IsFromCache);
     }
@@ -189,7 +190,7 @@ public sealed class ScheduleSession(
                 GetSubgroupNumber(Profile),
                 cancellationToken);
             Apply(result);
-            LastError = null;
+            LastError = result.Warning;
         }
         catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException or InvalidDataException or JsonException ||
             exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
@@ -201,7 +202,9 @@ public sealed class ScheduleSession(
 
     private void Apply(CfuScheduleLoadResult result)
     {
+        LastError = result.Warning;
         Snapshot = result.Snapshot;
+        Calendar = result.Calendar;
         UpdatedAtUtc = result.UpdatedAtUtc;
         IsFromCache = result.IsFromCache;
         if (!result.IsFromCache)

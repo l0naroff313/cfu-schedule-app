@@ -52,7 +52,8 @@ public sealed class WebAppState(
 
     public bool IsInitialized { get; private set; }
 
-    public string? ErrorText { get; private set; }
+    private string? _errorText;
+    public string? ErrorText { get => _errorText ?? scheduleSession.LastError; private set => _errorText = value; }
 
     public string Theme { get; private set; } = "light";
 
@@ -199,7 +200,7 @@ public sealed class WebAppState(
         : (int)Math.Round(CompletedAssignmentCount * 100d / Assignments.Count);
 
     public string WeekParityText => AcademicWeekParityResolver.Format(
-        AcademicWeekParityResolver.Resolve(SelectedDate, ReferenceCatalog?.Calendar));
+        AcademicWeekParityResolver.Resolve(SelectedDate, scheduleSession.Calendar ?? ReferenceCatalog?.Calendar));
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -404,9 +405,10 @@ public sealed class WebAppState(
             IsOfflineReady = false;
             OfflineStatusText = "Расписание сохранено. Проверка файлов доступна в профиле.";
         }
-        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or InvalidDataException or JsonException)
         {
-            ErrorText = "Не удалось получить расписание выбранной группы. Проверьте подключение к сети.";
+            ErrorText = exception is InvalidDataException ? exception.Message
+                : "Не удалось получить расписание выбранной группы. Проверьте подключение к сети.";
         }
         finally
         {
