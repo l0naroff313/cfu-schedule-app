@@ -29,6 +29,7 @@ public sealed class ElectiveSelection(CfuScheduleRepository repository) : Observ
     } }
     public CfuElectiveGroup? Group { get => _group; set {
         if (!SetProperty(ref _group, value)) return;
+        if (value is not null) _unresolvedSelection = false;
         Modules.Clear();
         foreach (int m in (_document?.Lessons ?? []).Where(l => l.GroupCode == value?.Code && l.Module.HasValue)
                      .Select(l => l.Module!.Value).Distinct().Order()) Modules.Add(m);
@@ -69,8 +70,13 @@ public sealed class ElectiveSelection(CfuScheduleRepository repository) : Observ
         var selected = Group; int? module = Module;
         try {
             _document = await repository.LoadElectivesAsync(cancellationToken);
+            Clear();
             Populate();
-            if (selected is not null && selected.Course == _course) { Discipline = selected.Discipline; Group = Groups.FirstOrDefault(g => g.Code == selected.Code); Module = module; }
+            if (selected is not null && selected.Course == _course) {
+                var current = _document.Groups.FirstOrDefault(g => g.Code == selected.Code && g.Course == _course);
+                if (current is not null) { Discipline = current.Discipline; Group = Groups.First(g => g.Code == current.Code); Module = module; }
+                else _unresolvedSelection = true;
+            }
             else if (profile?.CourseNumber == _course) Restore(profile);
             Status = _unresolvedSelection ? "Сохранённая группа электива не найдена. Повторите загрузку или явно отмените выбор электива."
                 : "Занятия добавятся к основной группе по дням и времени КФУ. Если расписание не опубликовано, сообщим об этом.";

@@ -589,7 +589,7 @@ else
                             </section>
                         }
                     </div>
-                    <div class="selected-profile-preview"><span>Будет загружено расписание</span><strong>@SelectedGroupText • @State.SelectedSubgroupNumber подгруппа</strong></div>
+                    <div class="selected-profile-preview"><span>Будет загружено расписание</span><strong>@SelectedGroupText • @State.SelectedSubgroupNumber подгруппа</strong>@if (State.Electives.Group is { } elective) { <strong>+ @elective.Code — @elective.Discipline</strong> }</div>
                     <button class="primary-button full-width" type="button" disabled="@(State.IsBusy || !State.Electives.CanSave)" @onclick="SaveProfileAsync">Показать расписание</button>
                 }
             </section>

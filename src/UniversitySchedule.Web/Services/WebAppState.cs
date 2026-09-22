@@ -312,6 +312,7 @@ public sealed class WebAppState(
         }
 
         ApplyProfileSelection();
+        Electives.Clear();
         if (Profile?.ElectiveGroupCode is not null) await Electives.LoadAsync(Profile, cancellationToken);
         NotifyChanged();
     }
