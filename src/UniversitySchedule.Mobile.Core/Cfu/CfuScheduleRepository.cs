@@ -24,7 +24,7 @@ public sealed record CfuTeacherSearchLoadResult(
     DateTimeOffset UpdatedAtUtc,
     bool IsFromCache);
 
-public sealed class CfuScheduleRepository
+public sealed partial class CfuScheduleRepository
 {
     public const string BaseAddress = "https://cfuv.ru/wp-json/cfu/v1/sched/";
 

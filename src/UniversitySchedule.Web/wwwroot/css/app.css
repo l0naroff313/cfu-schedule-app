@@ -342,6 +342,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .retry-icon-button { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid color-mix(in srgb, var(--danger) 18%, var(--border)); border-radius: 9px; color: var(--danger); background: var(--surface-soft); cursor: pointer; }
 .retry-icon-button:active { background: color-mix(in srgb, var(--danger-soft) 68%, var(--surface-soft)); transform: scale(.97); }
 .form-grid { display: grid; gap: 13px; }
+.elective-setup { display: grid; gap: 12px; min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.elective-setup p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .form-grid label { display: grid; gap: 6px; }
 .form-grid label > span { color: var(--muted); font-size: 10px; font-weight: 650; }
 .form-grid input, .form-grid select, .form-grid textarea { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 11px; outline: 0; color: var(--text); background: var(--surface); }

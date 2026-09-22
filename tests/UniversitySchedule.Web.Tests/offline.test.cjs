@@ -13,7 +13,7 @@ fs.mkdirSync(artifacts, { recursive: true });
 const indexFixture = {
     bells: [{ 'пара': 1, 'начало': '08:00', 'конец': '09:30' }],
     weeks: { ch: ['2026-09-07'], nch: ['2026-09-14'] },
-    tree: { 'ФТИ': { '09.03.04 Программная инженерия': { '2': ['ПИ-б-о-252'] } } }
+    tree: { 'ФТИ': { '09.03.04 Программная инженерия': { '1': ['ПИ-б-о-261'], '2': ['ПИ-б-о-252'], '4': ['ПИ-б-о-232'] } } }
 };
 const groupFixture = {
     'код': 'ПИ-б-о-252', 'fak': [],
@@ -22,6 +22,18 @@ const groupFixture = {
         'чётность': 'чёт', 'предмет': 'Алгоритмы', 'вид': 'ЛК',
         'преподаватели': ['Иванова Н. П.'], 'аудитория': '305'
     }]
+};
+const electiveFixture = {
+    'звонки': indexFixture.bells,
+    'недели': { 'чётные': indexFixture.weeks.ch, 'нечётные': indexFixture.weeks.nch },
+    'группы': [
+        { 'код': 'ЦК-700', 'курс': 2, 'дисциплина': 'Цифровое моделирование' },
+        { 'код': 'ДРПК-101', 'курс': 4, 'дисциплина': 'Право' }
+    ],
+    'занятия': [1, 2].flatMap(module => [2, 6].map(day => ({
+        'группа': 'ЦК-700', 'день': day, 'пара': 1, 'модуль': module, 'чётность': '',
+        'предмет': `Моделирование: модуль ${module}`, 'вид': 'ПЗ', 'аудитория': '107'
+    })))
 };
 const mime = {
     '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json',
@@ -103,13 +115,29 @@ for (const [browserName, browserType] of [['chromium', chromium], ['webkit', web
             context.setDefaultTimeout(30000);
             let online = true;
             await context.route('https://cfuv.ru/**', route => online
-                ? route.fulfill({ json: route.request().url().includes('/index') ? indexFixture : groupFixture })
+                ? route.fulfill({ json: route.request().url().includes('/index') ? indexFixture
+                    : route.request().url().includes('/elektiv') ? electiveFixture : groupFixture })
                 : route.abort());
             let page = await context.newPage();
             page.on('pageerror', error => t.diagnostic(error.message));
             await page.goto(server.url);
+            const course = page.getByLabel('Курс', { exact: true });
+            await course.selectOption('1');
+            assert.equal(await page.locator('.elective-setup').count(), 0);
+            await course.selectOption('4');
+            await page.getByRole('button', { name: 'Выбрать / обновить группу ЦК или ДРПК', exact: true }).click();
+            await page.getByLabel('Элективная дисциплина', { exact: true }).selectOption('Право');
+            assert.match(await page.getByLabel('Группа ЦК / ДРПК', { exact: true }).innerText(), /ДРПК-101/);
+            await course.selectOption('2');
+            await page.getByLabel('Элективная дисциплина', { exact: true }).selectOption('Цифровое моделирование');
+            await page.getByLabel('Группа ЦК / ДРПК', { exact: true }).selectOption('ЦК-700');
+            assert.equal(await page.getByRole('button', { name: 'Показать расписание', exact: true }).isDisabled(), true);
+            await page.getByLabel('Текущий модуль ЦК', { exact: true }).selectOption('1');
             await page.getByRole('button', { name: 'Показать расписание', exact: true }).click();
             await page.locator('.profile-setup-layer').waitFor({ state: 'hidden' });
+            const savedProfile = await page.evaluate(async () => JSON.parse((await cfuStorage.getDocument('profile:academic')).content));
+            assert.equal(savedProfile.ElectiveGroupCode, 'ЦК-700');
+            assert.equal(savedProfile.ElectiveModule, 1);
             await ensureControlled(page);
             await page.getByRole('navigation').getByRole('button', { name: 'Профиль', exact: true }).click();
             await page.locator('.offline-card button').click();
@@ -223,6 +251,8 @@ for (const [browserName, browserType] of [['chromium', chromium], ['webkit', web
             assert.match(await page.locator('.student-card').innerText(), /ПИ-б-о-252/);
             const navigation = await page.evaluate(() => cfuOffline.getStatus());
             assert.equal(navigation.isReady, true);
+            const cachedElective = await page.evaluate(() => cfuStorage.getDocument('cfu:electives:v1'));
+            assert.equal(JSON.parse(cachedElective.content).занятия.length, 4);
             const cachedGroup = await page.evaluate(() => cfuStorage.getDocument('cfu:group:пи-б-о-252'));
             const cachedSchedule = JSON.parse(cachedGroup.content);
             assert.ok(cachedSchedule.занятия.some(lesson => lesson.предмет === 'Алгоритмы'));

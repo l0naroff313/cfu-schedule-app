@@ -54,8 +54,8 @@ public sealed class ScheduleSession(
             {
                 try
                 {
-                    CfuScheduleLoadResult? cached = await _scheduleRepository.LoadCachedGroupScheduleAsync(
-                        Profile.GroupName, GetSubgroupNumber(Profile), cancellationToken);
+                    CfuScheduleLoadResult? cached = await _scheduleRepository.LoadProfileScheduleAsync(
+                        Profile, true, cancellationToken);
                     if (cached is not null) Apply(cached);
                 }
                 catch (Exception exception) when (exception is InvalidDataException or JsonException)
@@ -82,8 +82,8 @@ public sealed class ScheduleSession(
         await _updateLock.WaitAsync(cancellationToken);
         try
         {
-            CfuScheduleLoadResult result = await _scheduleRepository.LoadGroupScheduleAsync(
-                profile.GroupName, GetSubgroupNumber(profile), cancellationToken);
+            CfuScheduleLoadResult result = (await _scheduleRepository.LoadProfileScheduleAsync(
+                profile, false, cancellationToken))!;
             await _profileStore.SaveAsync(profile, cancellationToken);
             Profile = profile;
             LastNetworkRefreshAtUtc = null;
@@ -124,10 +124,8 @@ public sealed class ScheduleSession(
                 return new OfflineScheduleReadiness(false, null, 0, null);
             }
 
-            CfuScheduleLoadResult? cached = await _scheduleRepository.LoadCachedGroupScheduleAsync(
-                Profile.GroupName,
-                GetSubgroupNumber(Profile),
-                cancellationToken);
+            CfuScheduleLoadResult? cached = await _scheduleRepository.LoadProfileScheduleAsync(
+                Profile, true, cancellationToken);
             return cached is null
                 ? new OfflineScheduleReadiness(false, Profile.GroupName, 0, null)
                 : new OfflineScheduleReadiness(
@@ -164,10 +162,8 @@ public sealed class ScheduleSession(
             throw new InvalidOperationException("Сначала выберите учебную группу.");
         }
 
-        CfuScheduleLoadResult result = await _scheduleRepository.LoadGroupScheduleAsync(
-            Profile.GroupName,
-            GetSubgroupNumber(Profile),
-            cancellationToken);
+        CfuScheduleLoadResult result = (await _scheduleRepository.LoadProfileScheduleAsync(
+            Profile, false, cancellationToken))!;
         Apply(result);
 
         OfflineScheduleReadiness readiness = await CheckOfflineReadinessAsync(cancellationToken);
@@ -185,10 +181,8 @@ public sealed class ScheduleSession(
     {
         try
         {
-            CfuScheduleLoadResult result = await _scheduleRepository.LoadGroupScheduleAsync(
-                Profile!.GroupName,
-                GetSubgroupNumber(Profile),
-                cancellationToken);
+            CfuScheduleLoadResult result = (await _scheduleRepository.LoadProfileScheduleAsync(
+                Profile!, false, cancellationToken))!;
             Apply(result);
             LastError = result.Warning;
         }

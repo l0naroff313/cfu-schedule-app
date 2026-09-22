@@ -70,6 +70,24 @@
                     Title="Выберите номер группы" />
             </Border>
 
+            <VerticalStackLayout IsVisible="{Binding Electives.IsEligible}" Spacing="12">
+                <Label Style="{StaticResource SectionTitle}" Text="Элективы ЦК и ДРПК" />
+                <Button Text="Выбрать / обновить группу ЦК или ДРПК" Clicked="OnElectivesClicked" />
+                <ActivityIndicator IsRunning="{Binding Electives.IsBusy}" IsVisible="{Binding Electives.IsBusy}" />
+                <Label Style="{StaticResource SecondaryText}" Text="{Binding Electives.Status}" />
+                <Border Style="{StaticResource Card}">
+                    <Picker Title="Элективная дисциплина" ItemsSource="{Binding Electives.Disciplines}" SelectedItem="{Binding Electives.Discipline}" />
+                </Border>
+                <Border Style="{StaticResource Card}">
+                    <Picker Title="Группа ЦК / ДРПК" ItemsSource="{Binding Electives.Groups}" SelectedItem="{Binding Electives.Group}" />
+                </Border>
+                <VerticalStackLayout IsVisible="{Binding Electives.HasModules}" Spacing="8">
+                    <Label Style="{StaticResource SecondaryText}" Text="КФУ не указал даты модулей. Выберите текущий модуль; он применяется к отображаемым неделям до ручного переключения." />
+                    <Picker Title="Текущий модуль" ItemsSource="{Binding Electives.Modules}" SelectedItem="{Binding Electives.Module}" />
+                </VerticalStackLayout>
+                <Button Text="Не добавлять электив" Clicked="OnClearElectiveClicked" />
+            </VerticalStackLayout>
+
             <Label Style="{StaticResource SectionTitle}" Text="Подгруппа" />
             <Border Style="{StaticResource Card}">
                 <Picker

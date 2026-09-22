@@ -9,4 +9,6 @@ public sealed record AcademicProfile(
     string GroupName,
     int CourseNumber,
     Guid? SubgroupId,
-    string? SubgroupName);
+    string? SubgroupName,
+    string? ElectiveGroupCode = null,
+    int? ElectiveModule = null);

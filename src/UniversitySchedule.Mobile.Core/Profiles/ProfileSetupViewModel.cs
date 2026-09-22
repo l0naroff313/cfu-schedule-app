@@ -30,6 +30,7 @@ public sealed class ProfileSetupViewModel(
     private bool _isBusy;
     private string _statusText = "Загружаем каталог КФУ…";
     private string? _errorText;
+    public ElectiveSelection Electives { get; } = new(scheduleRepository);
 
     public ObservableCollection<InstituteSummary> Institutes { get; } = [];
 
@@ -127,7 +128,7 @@ public sealed class ProfileSetupViewModel(
         }
     }
 
-    public bool CanSave => !IsBusy &&
+    public bool CanSave => !IsBusy && Electives.CanSave &&
                            SelectedInstitute is not null &&
                            SelectedDirection is not null &&
                            SelectedCourse is not null &&
@@ -170,6 +171,10 @@ public sealed class ProfileSetupViewModel(
 
             Replace(Institutes, _catalog.Institutes);
             RestoreSelection(_scheduleSession.Profile);
+            Electives.PropertyChanged -= OnElectiveChanged;
+            Electives.PropertyChanged += OnElectiveChanged;
+            if (_scheduleSession.Profile?.ElectiveGroupCode is not null)
+                await Electives.LoadAsync(_scheduleSession.Profile, cancellationToken);
         }
         catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException or InvalidDataException or System.Text.Json.JsonException)
         {
@@ -209,7 +214,9 @@ public sealed class ProfileSetupViewModel(
                 subgroupId,
                 SelectedSubgroup.Number is int selectedNumber
                     ? $"{selectedNumber} подгруппа"
-                    : null);
+                    : null,
+                Electives.IsEligible ? Electives.Group?.Code : null,
+                Electives.IsEligible ? Electives.Module : null);
             await _scheduleSession.SetProfileAsync(profile, cancellationToken);
             StatusText = "Расписание сохранено на устройстве.";
             return true;
@@ -304,8 +311,12 @@ public sealed class ProfileSetupViewModel(
 
     private void OnSelectionChanged()
     {
+        Electives.SetCourse(SelectedCourse ?? 0);
         OnPropertyChanged(nameof(CanSave));
     }
+
+    private void OnElectiveChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args) => OnPropertyChanged(nameof(CanSave));
+    public Task LoadElectivesAsync() => Electives.LoadAsync(_scheduleSession.Profile);
 
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> source)
     {

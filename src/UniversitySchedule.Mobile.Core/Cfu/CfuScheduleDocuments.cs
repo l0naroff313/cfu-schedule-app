@@ -72,6 +72,9 @@ public sealed class CfuGroupScheduleDocument
 
 public sealed class CfuLessonDocument
 {
+    [JsonPropertyName("модуль")]
+    public int? Module { get; init; }
+
     [JsonPropertyName("группа")]
     public string GroupCode { get; init; } = string.Empty;
 

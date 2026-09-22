@@ -39,6 +39,9 @@ public partial class ProfileSetupPage : ContentPage
         }
     }
 
+    private async void OnElectivesClicked(object? sender, EventArgs e) => await _viewModel.LoadElectivesAsync();
+    private void OnClearElectiveClicked(object? sender, EventArgs e) => _viewModel.Electives.Clear();
+
     private async void OnRetryClicked(object? sender, EventArgs e)
     {
         CancellationToken cancellationToken = _loadCancellation?.Token ?? CancellationToken.None;

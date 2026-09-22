@@ -567,9 +567,30 @@ else
                             <label><span>Подгруппа</span><select value="@State.SelectedSubgroupNumber" @onchange="OnSubgroupChanged"><option value="1">1 подгруппа</option><option value="2">2 подгруппа</option></select></label>
                         </div>
                         <label><span>Номер группы</span><select value="@State.SelectedGroupId" @onchange="OnGroupChanged">@foreach (StudyGroupSummary group in State.Groups) { <option value="@group.Id">@group.Name</option> }</select></label>
+                        @if (State.Electives.IsEligible)
+                        {
+                            <section class="elective-setup">
+                                <button class="secondary-button full-width" type="button" disabled="@State.Electives.IsBusy" @onclick="State.LoadElectivesAsync">Выбрать / обновить группу ЦК или ДРПК</button>
+                                <p class="muted">@State.Electives.Status</p>
+                                <button class="secondary-button" type="button" @onclick="State.Electives.Clear">Не добавлять электив</button>
+                                @if (State.Electives.Disciplines.Count > 0)
+                                {
+                                    <label><span>Элективная дисциплина</span><select value="@State.Electives.Discipline" @onchange="e => State.Electives.Discipline = string.IsNullOrEmpty(e.Value?.ToString()) ? null : e.Value!.ToString()"><option value="">Без электива / выбрать позже</option>@foreach (var d in State.Electives.Disciplines) { <option value="@d">@d</option> }</select></label>
+                                    @if (State.Electives.Discipline is not null)
+                                    {
+                                        <label><span>Группа ЦК / ДРПК</span><select value="@State.Electives.Group?.Code" @onchange="e => State.Electives.Group = State.Electives.Groups.FirstOrDefault(g => g.Code == e.Value?.ToString())"><option value="">Выберите группу электива</option>@foreach (var g in State.Electives.Groups) { <option value="@g.Code">@g.Code</option> }</select></label>
+                                    }
+                                    @if (State.Electives.HasModules)
+                                    {
+                                        <label><span>Текущий модуль ЦК</span><select value="@State.Electives.Module" @onchange="e => State.Electives.Module = int.TryParse(e.Value?.ToString(), out int m) ? m : null"><option value="">Выберите модуль</option>@foreach (int m in State.Electives.Modules) { <option value="@m">Модуль @m</option> }</select></label>
+                                        <p class="muted">КФУ не указал даты модулей. Выбранный модуль показывается во всех загруженных неделях до ручного переключения в профиле.</p>
+                                    }
+                                }
+                            </section>
+                        }
                     </div>
                     <div class="selected-profile-preview"><span>Будет загружено расписание</span><strong>@SelectedGroupText • @State.SelectedSubgroupNumber подгруппа</strong></div>
-                    <button class="primary-button full-width" type="button" disabled="@State.IsBusy" @onclick="SaveProfileAsync">Показать расписание</button>
+                    <button class="primary-button full-width" type="button" disabled="@(State.IsBusy || !State.Electives.CanSave)" @onclick="SaveProfileAsync">Показать расписание</button>
                 }
             </section>
         </div>;

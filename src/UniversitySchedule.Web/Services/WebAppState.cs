@@ -76,6 +76,14 @@ public sealed class WebAppState(
     public Guid SelectedGroupId { get; private set; }
 
     public int SelectedSubgroupNumber { get; private set; } = 1;
+    public ElectiveSelection Electives { get; } = new(scheduleRepository);
+    public async Task LoadElectivesAsync()
+    {
+        var task = Electives.LoadAsync(Profile);
+        NotifyChanged();
+        await task;
+        NotifyChanged();
+    }
 
     public DateOnly SelectedDate { get; private set; } = TodayAtUniversity(TimeProvider.System);
 
@@ -304,6 +312,7 @@ public sealed class WebAppState(
         }
 
         ApplyProfileSelection();
+        if (Profile?.ElectiveGroupCode is not null) await Electives.LoadAsync(Profile, cancellationToken);
         NotifyChanged();
     }
 
@@ -339,6 +348,7 @@ public sealed class WebAppState(
         SelectedInstituteId = instituteId;
         SelectedDirectionId = Directions.FirstOrDefault()?.Id ?? Guid.Empty;
         SelectedCourseNumber = Courses.FirstOrDefault();
+        Electives.SetCourse(SelectedCourseNumber);
         SelectedGroupId = Groups.FirstOrDefault()?.Id ?? Guid.Empty;
         NotifyChanged();
     }
@@ -347,6 +357,7 @@ public sealed class WebAppState(
     {
         SelectedDirectionId = directionId;
         SelectedCourseNumber = Courses.FirstOrDefault();
+        Electives.SetCourse(SelectedCourseNumber);
         SelectedGroupId = Groups.FirstOrDefault()?.Id ?? Guid.Empty;
         NotifyChanged();
     }
@@ -354,6 +365,7 @@ public sealed class WebAppState(
     public void SelectCourse(int courseNumber)
     {
         SelectedCourseNumber = courseNumber;
+        Electives.SetCourse(courseNumber);
         SelectedGroupId = Groups.FirstOrDefault()?.Id ?? Guid.Empty;
         NotifyChanged();
     }
@@ -372,6 +384,7 @@ public sealed class WebAppState(
 
     public async Task SaveProfileAsync(CancellationToken cancellationToken = default)
     {
+        if (!Electives.CanSave) return;
         StudyGroupSummary group = Groups.FirstOrDefault(item => item.Id == SelectedGroupId)
             ?? throw new InvalidOperationException("Выберите учебную группу.");
         DirectionSummary direction = Directions.First(item => item.Id == group.DirectionId);
@@ -391,7 +404,9 @@ public sealed class WebAppState(
             group.Name,
             group.CourseNumber,
             subgroupId,
-            subgroupNumber is null ? null : $"Подгруппа {subgroupNumber}");
+            subgroupNumber is null ? null : $"Подгруппа {subgroupNumber}",
+            Electives.IsEligible ? Electives.Group?.Code : null,
+            Electives.IsEligible ? Electives.Module : null);
 
         IsBusy = true;
         ErrorText = null;
@@ -658,6 +673,7 @@ public sealed class WebAppState(
             Catalog = (await scheduleRepository.LoadCatalogAsync(cancellationToken)).Catalog;
             ErrorText = null;
             ApplyProfileSelection();
+            if (Profile?.ElectiveGroupCode is not null) await Electives.LoadAsync(Profile, cancellationToken);
         }
         catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException)
         {
@@ -688,6 +704,7 @@ public sealed class WebAppState(
         SelectedInstituteId = direction.InstituteId;
         SelectedDirectionId = direction.Id;
         SelectedCourseNumber = targetGroup.CourseNumber;
+        Electives.SetCourse(SelectedCourseNumber);
         SelectedGroupId = targetGroup.Id;
         SelectedSubgroupNumber = Profile?.SubgroupName is { } subgroupName &&
                                  subgroupName.Contains("2", StringComparison.Ordinal)
