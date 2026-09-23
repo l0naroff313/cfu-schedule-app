@@ -11,7 +11,8 @@ public sealed class CfuElectiveTests
     private static AcademicProfile Profile(int course = 2, string? elective = "ЦК-700", int? module = 1) =>
         new(Guid.NewGuid(), "ФТИ", Guid.NewGuid(), "ПИ", Guid.NewGuid(), "ПИ-б-о-252", course, null, null, elective, module);
 
-    private static readonly CfuBellDocument[] Bells = [new() { PairNumber = 1, StartsAt = "08:00", EndsAt = "09:30" }];
+    private static readonly CfuBellDocument[] Bells = Enumerable.Range(1, 6)
+        .Select(n => new CfuBellDocument { PairNumber = n, StartsAt = $"{6 + n * 2:00}:00", EndsAt = $"{7 + n * 2:00}:30" }).ToArray();
     private static readonly CfuElectiveDocument Document = new() {
         Bells = Bells, Weeks = new() { Even = ["2026-09-21"], Odd = ["2026-09-28"] },
         Groups = [new() { Code = "ЦК-700", Course = 2, Discipline = "3Д" }, new() { Code = "ДРПК-101", Course = 4, Discipline = "Право" }],
@@ -78,6 +79,9 @@ public sealed class CfuElectiveTests
         Assert.DoesNotContain(result.Snapshot.Lessons, l => l.Subject == "Элективные дисциплины");
         Assert.Contains(result.Snapshot.Lessons, l => l.Subject == "Математика");
         Assert.Contains(result.Snapshot.Lessons, l => l.Subject == "Модуль один");
+        Assert.DoesNotContain(result.Snapshot.Lessons, l => l.Subject.StartsWith("Элективная дисциплина"));
+        Assert.Equal(2, result.Snapshot.Lessons.Count(l => l.Date == new DateOnly(2026, 9, 22)));
+        Assert.Single(result.Snapshot.Lessons, l => l.Date == new DateOnly(2026, 9, 26));
         var offline = Repository(store, offline: true);
         var cached = (await offline.LoadProfileScheduleAsync(profile, true))!;
         Assert.Equal(result.Snapshot.Lessons.Select(l => l.Id), cached.Snapshot.Lessons.Select(l => l.Id));
@@ -85,6 +89,8 @@ public sealed class CfuElectiveTests
         Assert.Equal(cached.Snapshot.Lessons.Count, refresh.Snapshot.Lessons.Count);
         var noElective = (await offline.LoadProfileScheduleAsync(profile with { ElectiveGroupCode = null }, true))!;
         Assert.DoesNotContain(noElective.Snapshot.Lessons, l => l.Subject == "Модуль один");
+        Assert.Equal(6, noElective.Snapshot.Lessons.Count(l => l.Date == new DateOnly(2026, 9, 22) &&
+            l.Subject.StartsWith("Элективная дисциплина")));
         var fourth = (await offline.LoadProfileScheduleAsync(profile with { CourseNumber = 1 }, true))!;
         Assert.DoesNotContain(fourth.Snapshot.Lessons, l => l.Subject == "Модуль один");
     }
@@ -110,7 +116,11 @@ public sealed class CfuElectiveTests
             Tree = new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>> {
                 ["ФТИ"] = new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> {
                     ["ПИ"] = new Dictionary<string, IReadOnlyList<string>> { ["2"] = ["ПИ-б-о-252"] } } } };
-        var group = new CfuGroupScheduleDocument { Code = "ПИ-б-о-252", Lessons = [Row("ПИ-б-о-252", "Элективные дисциплины", 2, null, "обе"), Row("ПИ-б-о-252", "Математика", 2, null, "обе")] };
+        var placeholders = new[] { 2, 6 }.SelectMany(day => Enumerable.Range(1, 6).Select(pair =>
+            new CfuLessonDocument { GroupCode = "ПИ-б-о-252", Subject = "Элективная дисциплина(цифровая подготовка)",
+                Day = day, PairNumber = pair, Parity = "обе" }));
+        var group = new CfuGroupScheduleDocument { Code = "ПИ-б-о-252", Lessons = [.. placeholders,
+            Row("ПИ-б-о-252", "Элективные дисциплины", 2, null, "обе"), Row("ПИ-б-о-252", "Математика", 2, null, "обе")] };
         return new(new HttpClient(new Handler(request => {
             if (offline) throw new HttpRequestException("offline");
             string json = request.RequestUri!.AbsolutePath.EndsWith("elektiv") ? JsonSerializer.Serialize(Document)

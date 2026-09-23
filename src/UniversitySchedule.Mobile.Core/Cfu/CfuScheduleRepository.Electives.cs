@@ -49,10 +49,9 @@ public sealed partial class CfuScheduleRepository
         }
 
         var extra = elective.Value.Map(profile);
-        var slots = extra.Lessons.Select(l => (l.Date, l.PairNumber)).ToHashSet();
-        // Replace only generic elective placeholders in the same slots; never erase ordinary subjects.
-        var lessons = main.Snapshot.Lessons.Where(l => !(slots.Contains((l.Date, l.PairNumber)) &&
-                l.Subject.Contains("электив", StringComparison.OrdinalIgnoreCase)))
+        // The group feed reserves several slots, not just the selected elective's slot.
+        // Remove those placeholders before adding actual lessons from the selected group.
+        var lessons = main.Snapshot.Lessons.Where(l => !IsElectivePlaceholder(l.Subject))
             .Concat(extra.Lessons).DistinctBy(l => l.Id).OrderBy(l => l.StartsAtUtc).ThenBy(l => l.Subject).ToArray();
         var warnings = new List<string>();
         if (main.Warning is not null) warnings.Add(main.Warning);
@@ -68,5 +67,12 @@ public sealed partial class CfuScheduleRepository
             UpdatedAtUtc = main.UpdatedAtUtc < elective.UpdatedAtUtc ? main.UpdatedAtUtc : elective.UpdatedAtUtc,
             Warning = warnings.Count == 0 ? null : string.Join(" ", warnings)
         };
+    }
+
+    private static bool IsElectivePlaceholder(string subject)
+    {
+        var title = subject.TrimStart();
+        return title.StartsWith("Элективная дисциплина", StringComparison.OrdinalIgnoreCase) ||
+            title.StartsWith("Элективные дисциплины", StringComparison.OrdinalIgnoreCase);
     }
 }
